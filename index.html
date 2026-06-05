@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Che Che"/>
 <title>Che Che Wallet</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -251,7 +251,7 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
   <div class="scroll-area" style="padding:16px;">
     <div class="qr-wrap">
       <div style="background:#fff;border-radius:12px;padding:12px;display:inline-block;margin:0 auto 12px;">
-        <canvas id="qr-canvas" width="180" height="180" style="display:block;"></canvas>
+        <div id="qr-canvas" style="width:180px;height:180px;"></div>
       </div>
       <div style="font-size:10px;color:#9A9880;margin-top:4px;" id="qr-info">—</div>
     </div>
@@ -770,13 +770,17 @@ function syncQR(){
     document.getElementById('plan-qr-status').style.color=cliActual.cafe_hoy?'var(--muted)':'var(--green)';
   } else pq.style.display='none';
   // Generar QR real con el teléfono del cliente
-  const canvas=document.getElementById('qr-canvas');
-  if(canvas && typeof QRCode !== 'undefined'){
-    QRCode.toCanvas(canvas, cliActual.telefono, {
+  const qrDiv = document.getElementById('qr-canvas');
+  if(qrDiv && typeof QRCode !== 'undefined'){
+    qrDiv.innerHTML = '';
+    new QRCode(qrDiv, {
+      text: cliActual.telefono,
       width: 180,
-      margin: 1,
-      color: { dark:'#2C2A1E', light:'#ffffff' }
-    }, err => { if(err) console.warn('QR error:',err); });
+      height: 180,
+      colorDark: '#2C2A1E',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
   }
 }
 
