@@ -493,22 +493,10 @@ const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 // ══════════════════════════════════════════
 const ADMIN_PASS = 'chechis_888';
 const BARISTAS = [
-  // Santa María la Ribera
-  {user:'IC01',   pass:'ic762',        nombre:'Isaac Cruz',          sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'mm02',   pass:'mm482',        nombre:'Mariana Mangas',      sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'km03',   pass:'km974',        nombre:'Karla Mangas',        sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'ma04',   pass:'ma925',        nombre:'Marcelo Amador',      sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'rt05',   pass:'kl864',        nombre:'Rolando Trejo',       sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'cab06',  pass:'ca069',        nombre:'Carol Aguilar',       sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'cj007',  pass:'elmasvergas',  nombre:'Clemente Jacques',    sucursal:'Santa María la Ribera', rol:'Barista'},
-  // Studio
-  {user:'mmo01',  pass:'MM#5r6t',      nombre:'Monserrat Machorro',  sucursal:'Studio',                rol:'Studio'},
-  {user:'vru02',  pass:'VR#2q9s',      nombre:'Violeta Ruiseñor',    sucursal:'Studio',                rol:'Studio'},
-  {user:'cga03',  pass:'CG#8j1v',      nombre:'Celic García',        sucursal:'Studio',                rol:'Studio'},
-  // Admin
-  {user:'lg001',  pass:'LG#9x2k',      nombre:'Luis Garinian',       sucursal:'Corporativo',           rol:'Admin'},
-  {user:'fh002',  pass:'FH#7m4p',      nombre:'Fernanda Hughes',     sucursal:'Corporativo',           rol:'Admin'},
-  {user:'vs003',  pass:'VS#3n8w',      nombre:'Victoria Santamaría', sucursal:'Corporativo',           rol:'Admin'},
+  {user:'ana.garcia',   pass:'cheche123', nombre:'Ana García',    sucursal:'Juárez',       rol:'Barista'},
+  {user:'pedro.lopez',  pass:'cheche123', nombre:'Pedro López',   sucursal:'Santa María',  rol:'Barista'},
+  {user:'sofia.ruiz',   pass:'cheche123', nombre:'Sofía Ruiz',    sucursal:'Del Valle',    rol:'Barista'},
+  {user:'carlos.m',     pass:'cheche123', nombre:'Carlos M.',     sucursal:'Tabacalera',   rol:'Barista'},
 ];
 const PLANES = {
   base:    {nombre:'Plan Base',    precio:890,  bebidas:['Espresso','Americano','Capuchino','Latte','Cortado','Flat White','Café de olla']},
