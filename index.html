@@ -160,8 +160,10 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
       <svg style="width:130px;height:38px;margin-bottom:20px;"><use href="#logo-cheche" fill="#F2EDE4"/></svg>
       <div class="label-s" style="color:#9A9880;margin-bottom:6px;">Tu número de teléfono</div>
       <input class="input-dk" id="login-tel" placeholder="55 1234 5678" type="tel" inputmode="numeric" style="font-family:monospace;"/>
+      <div class="label-s" style="color:#9A9880;margin-bottom:6px;margin-top:12px;">Tu PIN de 4 dígitos</div>
+      <input class="input-dk" id="login-pin" placeholder="••••" type="password" inputmode="numeric" maxlength="4" style="font-size:24px;letter-spacing:8px;text-align:center;"/>
       <button class="btn-T" onclick="loginCliente()">Entrar</button>
-      <div id="login-err" style="font-size:11px;color:var(--terra);margin-top:8px;text-align:center;display:none;">Número no encontrado</div>
+      <div id="login-err" style="font-size:11px;color:var(--terra);margin-top:8px;text-align:center;display:none;">Teléfono o PIN incorrecto</div>
       <button onclick="showReg()" style="background:transparent;border:none;color:#9A9880;font-size:12px;margin-top:12px;cursor:pointer;">¿No tienes cuenta? Regístrate</button>
     </div>
   </div>
@@ -176,6 +178,9 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
         <input class="input-dk" id="reg-nombre" placeholder="Luis Martínez" type="text"/>
         <div class="label-s" style="color:var(--light);margin-bottom:5px;">Celular</div>
         <input class="input-dk" id="reg-tel" placeholder="55 1234 5678" type="tel" inputmode="numeric" required/>
+        <div class="label-s" style="color:var(--light);margin-bottom:5px;">PIN de 4 dígitos</div>
+        <input class="input-dk" id="reg-pin" placeholder="••••" type="password" inputmode="numeric" maxlength="4" style="font-size:24px;letter-spacing:8px;text-align:center;"/>
+        <div style="font-size:11px;color:#9A9880;margin-bottom:4px;">Lo usarás para entrar a tu monedero</div>
         <button class="btn-T" onclick="rs2()">Continuar</button>
       </div>
       <div id="rs2" style="display:none;">
@@ -614,14 +619,14 @@ async function buscarClienteDB(v){
 }
 
 // Registrar cliente nuevo
-async function registrarClienteDB(nombre, telefono, montoInicial){
+async function registrarClienteDB(nombre, telefono, pin, montoInicial){
   showLoader(true);
   try {
     // Obtener siguiente número
     const {count}=await sb.from('wallet_clientes').select('*',{count:'exact',head:true});
     const codigo=genCodigo((count||0)+1);
     const saldo=montoInicial*1.1;
-    const {data,error}=await sb.from('wallet_clientes').insert({codigo,nombre,telefono,saldo}).select().single();
+    const {data,error}=await sb.from('wallet_clientes').insert({codigo,nombre,telefono,pin,saldo}).select().single();
     if(error) throw error;
     // Registrar movimiento de carga inicial
     if(montoInicial>0){
@@ -718,10 +723,12 @@ function showReg(){document.getElementById('cli-splash').style.display='none';do
 function showLogin(){document.getElementById('cli-splash').style.display='none';document.getElementById('cli-login').style.display='block';}
 async function loginCliente(){
   const tel=document.getElementById('login-tel').value.replace(/\D/g,'');
+  const pin=document.getElementById('login-pin').value.trim();
   if(tel.length<10){showToast('Ingresa tu número completo',false);return;}
+  if(pin.length<4){showToast('Ingresa tu PIN de 4 dígitos',false);return;}
   showLoader(true);
   try {
-    const {data,error}=await sb.from('wallet_clientes').select('*').eq('telefono',tel).eq('activo',true).single();
+    const {data,error}=await sb.from('wallet_clientes').select('*').eq('telefono',tel).eq('pin',pin).eq('activo',true).single();
     if(error||!data){document.getElementById('login-err').style.display='block';return;}
     cliActual=data;
     document.getElementById('cli-login').style.display='none';
@@ -773,15 +780,16 @@ function syncQR(){
   }
 }
 
-function rs2(){if(!document.getElementById('reg-nombre').value.trim()){showToast('Escribe tu nombre',false);return;}const telVal=document.getElementById('reg-tel').value.replace(/\D/g,'');if(telVal.length<10){showToast('Ingresa un teléfono de 10 dígitos',false);return;}document.getElementById('rs1').style.display='none';document.getElementById('rs2').style.display='block';document.getElementById('sd1').classList.remove('on');document.getElementById('sd2').classList.add('on');}
+function rs2(){if(!document.getElementById('reg-nombre').value.trim()){showToast('Escribe tu nombre',false);return;}const telVal=document.getElementById('reg-tel').value.replace(/\D/g,'');if(telVal.length<10){showToast('Ingresa un teléfono de 10 dígitos',false);return;}const pinVal=document.getElementById('reg-pin').value.trim();if(pinVal.length<4){showToast('Tu PIN debe tener 4 dígitos',false);return;}document.getElementById('rs1').style.display='none';document.getElementById('rs2').style.display='block';document.getElementById('sd1').classList.remove('on');document.getElementById('sd2').classList.add('on');}
 function rs1back(){document.getElementById('rs2').style.display='none';document.getElementById('rs1').style.display='block';document.getElementById('sd2').classList.remove('on');document.getElementById('sd1').classList.add('on');}
 function selMonto(m,btn){montoSel=m;document.querySelectorAll('#montos-grid button').forEach(b=>{b.style.border='1px solid #5A5E50';b.style.background='var(--olive2)';});btn.style.border='1px solid var(--terra)';btn.style.background='var(--terra2)';document.getElementById('bono-prev').textContent=m>0?'Con bono 10% recibes '+fmt(m*1.1):'';}
 
 async function rs3(){
   const n=document.getElementById('reg-nombre').value.trim();
   const tel=document.getElementById('reg-tel').value.trim();
+  const pin=document.getElementById('reg-pin').value.trim();
   try {
-    const data=await registrarClienteDB(n, tel, montoSel);
+    const data=await registrarClienteDB(n, tel, pin, montoSel);
     cliActual=data;
     document.getElementById('rs2').style.display='none';
     document.getElementById('rs3').style.display='block';
