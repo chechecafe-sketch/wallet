@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Che Che"/>
 <title>Che Che Wallet</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -230,24 +231,10 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
   </div>
   <div class="scroll-area" style="padding:16px;">
     <div class="qr-wrap">
-      <svg width="160" height="160" viewBox="0 0 160 160" style="display:block;margin:0 auto 12px;">
-        <rect width="160" height="160" fill="#2C2A1E"/>
-        <rect x="10" y="10" width="44" height="44" fill="none" stroke="#F2EDE4" stroke-width="4"/>
-        <rect x="20" y="20" width="24" height="24" fill="#F2EDE4"/>
-        <rect x="106" y="10" width="44" height="44" fill="none" stroke="#F2EDE4" stroke-width="4"/>
-        <rect x="116" y="20" width="24" height="24" fill="#F2EDE4"/>
-        <rect x="10" y="106" width="44" height="44" fill="none" stroke="#F2EDE4" stroke-width="4"/>
-        <rect x="20" y="116" width="24" height="24" fill="#F2EDE4"/>
-        <rect x="66" y="10" width="8" height="8" fill="#F2EDE4"/><rect x="76" y="10" width="8" height="8" fill="#F2EDE4"/>
-        <rect x="66" y="20" width="8" height="8" fill="#F2EDE4"/><rect x="86" y="10" width="8" height="8" fill="#F2EDE4"/>
-        <rect x="106" y="66" width="8" height="8" fill="#F2EDE4"/><rect x="116" y="66" width="8" height="8" fill="#F2EDE4"/>
-        <rect x="126" y="66" width="8" height="8" fill="#F2EDE4"/><rect x="136" y="66" width="8" height="8" fill="#F2EDE4"/>
-        <rect x="146" y="66" width="8" height="8" fill="#F2EDE4"/><rect x="106" y="76" width="8" height="8" fill="#F2EDE4"/>
-        <rect x="126" y="76" width="8" height="8" fill="#F2EDE4"/><rect x="106" y="106" width="8" height="8" fill="#F2EDE4"/>
-        <rect x="116" y="106" width="8" height="8" fill="#F2EDE4"/><rect x="106" y="126" width="8" height="8" fill="#F2EDE4"/>
-        <rect x="66" y="66" width="28" height="28" fill="#B5522A"/>
-      </svg>
-      <div style="font-size:10px;color:#9A9880;" id="qr-info">—</div>
+      <div style="background:#fff;border-radius:12px;padding:12px;display:inline-block;margin:0 auto 12px;">
+        <canvas id="qr-canvas" width="180" height="180" style="display:block;"></canvas>
+      </div>
+      <div style="font-size:10px;color:#9A9880;margin-top:4px;" id="qr-info">—</div>
     </div>
     <div class="card-beige" style="text-align:center;">
       <div class="label-s" style="margin-bottom:4px;">Saldo disponible</div>
@@ -493,10 +480,22 @@ const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 // ══════════════════════════════════════════
 const ADMIN_PASS = 'chechis_888';
 const BARISTAS = [
-  {user:'ana.garcia',   pass:'cheche123', nombre:'Ana García',    sucursal:'Juárez',       rol:'Barista'},
-  {user:'pedro.lopez',  pass:'cheche123', nombre:'Pedro López',   sucursal:'Santa María',  rol:'Barista'},
-  {user:'sofia.ruiz',   pass:'cheche123', nombre:'Sofía Ruiz',    sucursal:'Del Valle',    rol:'Barista'},
-  {user:'carlos.m',     pass:'cheche123', nombre:'Carlos M.',     sucursal:'Tabacalera',   rol:'Barista'},
+  // Santa María la Ribera
+  {user:'IC01',   pass:'ic762',        nombre:'Isaac Cruz',          sucursal:'Santa María la Ribera', rol:'Barista'},
+  {user:'mm02',   pass:'mm482',        nombre:'Mariana Mangas',      sucursal:'Santa María la Ribera', rol:'Barista'},
+  {user:'km03',   pass:'km974',        nombre:'Karla Mangas',        sucursal:'Santa María la Ribera', rol:'Barista'},
+  {user:'ma04',   pass:'ma925',        nombre:'Marcelo Amador',      sucursal:'Santa María la Ribera', rol:'Barista'},
+  {user:'rt05',   pass:'kl864',        nombre:'Rolando Trejo',       sucursal:'Santa María la Ribera', rol:'Barista'},
+  {user:'cab06',  pass:'ca069',        nombre:'Carol Aguilar',       sucursal:'Santa María la Ribera', rol:'Barista'},
+  {user:'cj007',  pass:'elmasvergas',  nombre:'Clemente Jacques',    sucursal:'Santa María la Ribera', rol:'Barista'},
+  // Studio
+  {user:'mmo01',  pass:'MM#5r6t',      nombre:'Monserrat Machorro',  sucursal:'Studio',                rol:'Studio'},
+  {user:'vru02',  pass:'VR#2q9s',      nombre:'Violeta Ruiseñor',    sucursal:'Studio',                rol:'Studio'},
+  {user:'cga03',  pass:'CG#8j1v',      nombre:'Celic García',        sucursal:'Studio',                rol:'Studio'},
+  // Admin
+  {user:'lg001',  pass:'LG#9x2k',      nombre:'Luis Garinian',       sucursal:'Corporativo',           rol:'Admin'},
+  {user:'fh002',  pass:'FH#7m4p',      nombre:'Fernanda Hughes',     sucursal:'Corporativo',           rol:'Admin'},
+  {user:'vs003',  pass:'VS#3n8w',      nombre:'Victoria Santamaría', sucursal:'Corporativo',           rol:'Admin'},
 ];
 const PLANES = {
   base:    {nombre:'Plan Base',    precio:890,  bebidas:['Espresso','Americano','Capuchino','Latte','Cortado','Flat White','Café de olla']},
@@ -704,7 +703,7 @@ function activarPanel(){
 function syncQR(){
   if(!cliActual)return;
   document.getElementById('saldo-qr').textContent=fmt(cliActual.saldo);
-  document.getElementById('qr-info').textContent=cliActual.nombre+' · #'+cliActual.codigo;
+  document.getElementById('qr-info').textContent=cliActual.nombre+' · '+cliActual.telefono;
   const pq=document.getElementById('plan-qr');
   if(cliActual.plan){
     pq.style.display='block';
@@ -712,6 +711,15 @@ function syncQR(){
     document.getElementById('plan-qr-status').textContent=cliActual.cafe_hoy?'Ya canjeó hoy':'Café disponible';
     document.getElementById('plan-qr-status').style.color=cliActual.cafe_hoy?'var(--muted)':'var(--green)';
   } else pq.style.display='none';
+  // Generar QR real con el teléfono del cliente
+  const canvas=document.getElementById('qr-canvas');
+  if(canvas && typeof QRCode !== 'undefined'){
+    QRCode.toCanvas(canvas, cliActual.telefono, {
+      width: 180,
+      margin: 1,
+      color: { dark:'#2C2A1E', light:'#ffffff' }
+    }, err => { if(err) console.warn('QR error:',err); });
+  }
 }
 
 function rs2(){if(!document.getElementById('reg-nombre').value.trim()){showToast('Escribe tu nombre',false);return;}const telVal=document.getElementById('reg-tel').value.replace(/\D/g,'');if(telVal.length<10){showToast('Ingresa un teléfono de 10 dígitos',false);return;}document.getElementById('rs1').style.display='none';document.getElementById('rs2').style.display='block';document.getElementById('sd1').classList.remove('on');document.getElementById('sd2').classList.add('on');}
