@@ -234,6 +234,13 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
       </div>
       <button class="btn-T" onclick="showScreen('qr')">Mostrar QR para pagar</button>
       <button class="btn-O" onclick="showScreen('plan')">+ Cargar saldo · Ver plan</button>
+      <!-- Puntos y nivel -->
+      <div class="card-beige" id="puntos-wrap" style="margin-bottom:10px;"></div>
+      <!-- Recompensas activas -->
+      <div style="margin-bottom:4px;">
+        <div class="section-t">🎁 Mis recompensas</div>
+        <div id="recompensas-lista"></div>
+      </div>
       <div class="section-t">Últimos movimientos</div>
       <div class="card-white" id="movs-lista"><div style="padding:14px;font-size:12px;color:var(--muted);text-align:center;">Sin movimientos aún</div></div>
       <div class="section-t">Notificaciones <span class="badge" id="notif-badge">3</span></div>
@@ -439,8 +446,42 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
         <div id="plan-noplan" style="display:none;text-align:center;padding:16px;font-size:12px;color:var(--muted);">Sin plan activo</div>
       </div>
       <div id="bt-ops" style="display:none;">
-        <div class="grid2"><div class="mc dk"><div class="ml">Cobros hoy</div><div class="mv" id="op-cobros">0</div></div><div class="mc dk"><div class="ml">Cargas hoy</div><div class="mv" id="op-cargas">0</div></div></div>
-        <div class="section-t">Operaciones</div>
+        <div class="grid2">
+          <div class="mc dk"><div class="ml">Cobros hoy</div><div class="mv" id="op-cobros">0</div></div>
+          <div class="mc dk"><div class="ml">Cargas hoy</div><div class="mv" id="op-cargas">0</div></div>
+        </div>
+        <!-- Comisiones del mes -->
+        <div style="background:#1A1C14;border-radius:12px;padding:14px;margin-bottom:10px;">
+          <div style="font-size:10px;color:#9A9880;letter-spacing:.1em;margin-bottom:10px;">MIS COMISIONES — ESTE MES</div>
+          <div class="grid2" style="gap:8px;">
+            <div style="background:#2C2A1E;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:#9A9880;margin-bottom:4px;">Por recargas</div>
+              <div style="font-size:18px;font-weight:700;color:#3A6B42;" id="com-recargas">$0</div>
+            </div>
+            <div style="background:#2C2A1E;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:10px;color:#9A9880;margin-bottom:4px;">Por activaciones</div>
+              <div style="font-size:18px;font-weight:700;color:#3A6B42;" id="com-activaciones">$0</div>
+            </div>
+          </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid #3A3D2E;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:11px;color:#9A9880;">Total acumulado</div>
+            <div style="font-size:22px;font-weight:700;color:var(--terra);" id="com-total">$0</div>
+          </div>
+          <!-- Bono progress -->
+          <div style="margin-top:10px;" id="bono-prog-wrap">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <div style="font-size:10px;color:#9A9880;" id="bono-label">Meta: 20 recargas → $200</div>
+              <div style="font-size:10px;color:var(--terra);" id="bono-count">0/20</div>
+            </div>
+            <div style="background:#2C2A1E;border-radius:20px;height:6px;overflow:hidden;">
+              <div id="bono-bar" style="background:var(--terra);height:100%;border-radius:20px;width:0%;transition:width .5s;"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Ranking -->
+        <div class="section-t">🏆 Ranking del mes</div>
+        <div id="ranking-lista" class="card-white"></div>
+        <div class="section-t" style="margin-top:10px;">Operaciones recientes</div>
         <div class="card-white" id="ops-lista"><div style="padding:14px;font-size:12px;color:var(--muted);text-align:center;">Sin operaciones aún</div></div>
       </div>
     </div>
@@ -542,6 +583,37 @@ const BARISTAS = [
   {user:'fh002',  pass:'FH#7m4p',      nombre:'Fernanda Hughes',     sucursal:'Corporativo',           rol:'Admin'},
   {user:'vs003',  pass:'VS#3n8w',      nombre:'Victoria Santamaría', sucursal:'Corporativo',           rol:'Admin'},
 ];
+const PROMOS = [
+  {id:'cafe26',    label:'☕ Café del día',      desc:'Cualquier café del día por $26',        valor:'$26',   rareza:'comun'},
+  {id:'pancafe',   label:'🥐 Pan + Café',         desc:'Pan de la casa + café por $80',         valor:'$80',   rareza:'comun'},
+  {id:'desayuno',  label:'🍳 Desayuno',            desc:'Desayuno completo por $89',             valor:'$89',   rareza:'comun'},
+  {id:'2x1',       label:'🎉 2x1 Bebida',          desc:'Compra una bebida y llévate otra gratis',valor:'2x1',  rareza:'poco_comun'},
+  {id:'3x2',       label:'🔥 3x2 Bebidas',         desc:'Compra dos bebidas y la tercera es gratis',valor:'3x2', rareza:'raro'},
+  {id:'latte15',   label:'⚡ Latte por $15',       desc:'Latte de cualquier leche por solo $15', valor:'$15',   rareza:'raro'},
+  {id:'gratis',    label:'🎁 Bebida gratis',        desc:'Una bebida completamente gratis',       valor:'gratis',rareza:'muy_raro'},
+];
+
+// Pesos de rareza para la ruleta
+const PESOS = {comun:50, poco_comun:25, raro:15, muy_raro:10};
+
+function girarRuleta(){
+  const pool = [];
+  PROMOS.forEach(p => {
+    const w = PESOS[p.rareza];
+    for(let i=0;i<w;i++) pool.push(p);
+  });
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+function getNivel(pts){
+  if(pts>=1500) return {nombre:'Embajador',badge:'⭐',color:'#B5522A',multi:3};
+  if(pts>=600)  return {nombre:'Fiel',     badge:'🏆',color:'#C9A84C',multi:2};
+  if(pts>=200)  return {nombre:'Regular',  badge:'🌿',color:'#3A6B42',multi:1.5};
+  return              {nombre:'Curioso',   badge:'☕',color:'#9A9880',multi:1};
+}
+
+const PUNTOS_POR_PROMO = 150;
+
 const PLANES = {
   base:    {nombre:'Plan Base',    precio:890,  bebidas:['Espresso','Americano','Capuchino','Latte','Cortado','Flat White','Café de olla']},
   plus:    {nombre:'Plan Plus',    precio:990,  bebidas:['Todo Base','+ Leche de avena','+ Leche de almendra','+ Leche de coco','+ Leche de soya']},
@@ -637,15 +709,37 @@ async function registrarClienteDB(nombre, telefono, pin, montoInicial){
 }
 
 // Cargar saldo
-async function cargarSaldoDB(clienteId, monto, metodo, barista, sucursal){
+async function cargarSaldoDB(clienteId, monto, metodo, barista, sucursal, esActivacion=false){
   showLoader(true);
   try {
-    const bono=monto*0.1;
-    const {data:cli}=await sb.from('wallet_clientes').select('saldo').eq('id',clienteId).single();
-    const nuevoSaldo=parseFloat(cli.saldo)+monto+bono;
-    await sb.from('wallet_clientes').update({saldo:nuevoSaldo}).eq('id',clienteId);
-    await sb.from('wallet_movimientos').insert({cliente_id:clienteId,tipo:'carga',monto,descripcion:`Carga + bono $${fmt(bono)}`,metodo,barista,sucursal});
-    return nuevoSaldo;
+    const bono = monto * 0.1;
+    // Doble puntos en recargas
+    const {data:cli} = await sb.from('wallet_clientes').select('*').eq('id',clienteId).single();
+    const nivel = getNivel(cli.puntos_totales || 0);
+    const ptsGanados = Math.floor((monto / 10) * nivel.multi * 2); // doble pts por recarga
+    const nuevoPts = (cli.puntos || 0) + ptsGanados;
+    const nuevosPtsTot = (cli.puntos_totales || 0) + ptsGanados;
+    const nuevoNivel = getNivel(nuevosPtsTot).nombre.toLowerCase();
+    const nuevoSaldo = parseFloat(cli.saldo) + monto + bono;
+
+    await sb.from('wallet_clientes').update({
+      saldo: nuevoSaldo,
+      puntos: nuevoPts,
+      puntos_totales: nuevosPtsTot,
+      nivel: nuevoNivel
+    }).eq('id', clienteId);
+
+    await sb.from('wallet_movimientos').insert({
+      cliente_id:clienteId, tipo:'carga', monto,
+      descripcion:`Carga + bono ${fmt(bono)} (+${ptsGanados} pts x2)`, metodo, barista, sucursal
+    });
+
+    // Comisión barista
+    const mes = new Date().toISOString().slice(0,7);
+    const comision = monto * 0.05;
+    await sb.from('wallet_comisiones').insert({barista, sucursal, tipo: esActivacion?'activacion':'recarga', monto_base:monto, comision, mes});
+
+    return {nuevoSaldo, ptsGanados};
   } finally { showLoader(false); }
 }
 
@@ -653,12 +747,51 @@ async function cargarSaldoDB(clienteId, monto, metodo, barista, sucursal){
 async function cobrarSaldoDB(clienteId, monto, barista, sucursal){
   showLoader(true);
   try {
-    const {data:cli}=await sb.from('wallet_clientes').select('saldo').eq('id',clienteId).single();
+    const {data:cli}=await sb.from('wallet_clientes').select('*').eq('id',clienteId).single();
     if(parseFloat(cli.saldo)<monto) throw new Error('Saldo insuficiente');
-    const nuevoSaldo=parseFloat(cli.saldo)-monto;
-    await sb.from('wallet_clientes').update({saldo:nuevoSaldo}).eq('id',clienteId);
-    await sb.from('wallet_movimientos').insert({cliente_id:clienteId,tipo:'cobro',monto,descripcion:'Consumo en tienda',metodo:'monedero',barista,sucursal});
-    return nuevoSaldo;
+    const nuevoSaldo = parseFloat(cli.saldo) - monto;
+
+    // Calcular puntos ganados (multiplicador por nivel)
+    const nivel = getNivel(cli.puntos_totales || 0);
+    const ptsGanados = Math.floor((monto / 10) * nivel.multi);
+    const nuevoPts = (cli.puntos || 0) + ptsGanados;
+    const nuevosPtsTot = (cli.puntos_totales || 0) + ptsGanados;
+
+    // ¿Desbloqueó promo?
+    const promoDesbloqueada = nuevoPts >= PUNTOS_POR_PROMO;
+    const ptsDespues = promoDesbloqueada ? nuevoPts - PUNTOS_POR_PROMO : nuevoPts;
+
+    // Nuevo nivel
+    const nuevoNivel = getNivel(nuevosPtsTot).nombre.toLowerCase();
+
+    await sb.from('wallet_clientes').update({
+      saldo: nuevoSaldo,
+      puntos: ptsDespues,
+      puntos_totales: nuevosPtsTot,
+      nivel: nuevoNivel
+    }).eq('id', clienteId);
+
+    await sb.from('wallet_movimientos').insert({
+      cliente_id:clienteId, tipo:'cobro', monto,
+      descripcion:`Consumo en tienda (+${ptsGanados} pts)`, metodo:'monedero', barista, sucursal
+    });
+
+    // Registrar comisión barista
+    const comision = monto * 0.05;
+    const mes = new Date().toISOString().slice(0,7);
+    await sb.from('wallet_comisiones').insert({barista, sucursal, tipo:'recarga', monto_base:monto, comision, mes});
+
+    // Desbloquear promo si aplica
+    let promo = null;
+    if(promoDesbloqueada){
+      promo = girarRuleta();
+      await sb.from('wallet_recompensas').insert({
+        cliente_id: clienteId,
+        promo: promo.label,
+        descripcion: promo.desc
+      });
+    }
+    return {nuevoSaldo, ptsGanados, promo, nuevoPts: ptsDespues};
   } finally { showLoader(false); }
 }
 
@@ -742,7 +875,7 @@ function showPanel(){
 }
 
 function activarPanel(){
-  ['cli-splash','cli-reg'].forEach(x=>document.getElementById(x).style.display='none');
+  ['cli-splash','cli-reg','cli-login'].forEach(x=>{const el=document.getElementById(x);if(el)el.style.display='none';});
   document.getElementById('cli-panel').style.display='flex';
   document.getElementById('saludo').textContent='Hola, '+cliActual.nombre.split(' ')[0];
   document.getElementById('avatar').textContent=cliActual.nombre.split(' ').map(x=>x[0]).join('').slice(0,2);
@@ -750,12 +883,60 @@ function activarPanel(){
   document.getElementById('codigo-display').textContent='#'+cliActual.codigo;
   renderMovs();
   renderNotifsCli();
+  renderPuntos();
+  renderRecompensas();
   if(cliActual.plan){
     const b=document.getElementById('plan-banner');
     b.style.display='block';
     document.getElementById('plan-banner-nombre').textContent=PLANES[cliActual.plan].nombre;
     document.getElementById('plan-banner-hoy').textContent=cliActual.cafe_hoy?'Café de hoy: canjeado':'Café de hoy: disponible';
   }
+}
+
+function renderPuntos(){
+  if(!cliActual) return;
+  const pts = cliActual.puntos || 0;
+  const ptsTot = cliActual.puntos_totales || 0;
+  const nivel = getNivel(ptsTot);
+  const el = document.getElementById('puntos-wrap');
+  if(!el) return;
+  const falta = PUNTOS_POR_PROMO - (pts % PUNTOS_POR_PROMO);
+  const progreso = ((pts % PUNTOS_POR_PROMO) / PUNTOS_POR_PROMO) * 100;
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div>
+        <span style="font-size:18px;">${nivel.badge}</span>
+        <span style="font-size:13px;font-weight:700;color:${nivel.color};margin-left:6px;">${nivel.nombre}</span>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:20px;font-weight:700;color:var(--dark);">${pts} <span style="font-size:11px;font-weight:400;color:var(--muted);">pts</span></div>
+      </div>
+    </div>
+    <div style="background:#E8E3DB;border-radius:20px;height:8px;margin-bottom:6px;overflow:hidden;">
+      <div style="background:${nivel.color};height:100%;border-radius:20px;width:${progreso}%;transition:width .5s;"></div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);text-align:center;">
+      ${falta === PUNTOS_POR_PROMO ? '¡Canjea tu recompensa! 🎁' : `${falta} pts para tu próxima recompensa 🎁`}
+    </div>`;
+}
+
+async function renderRecompensas(){
+  if(!cliActual) return;
+  const {data} = await sb.from('wallet_recompensas').select('*').eq('cliente_id', cliActual.id).eq('usado', false).order('fecha', {ascending:false});
+  const el = document.getElementById('recompensas-lista');
+  if(!el) return;
+  if(!data || !data.length){
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:10px;">Sin recompensas aún — sigue consumiendo ☕</div>';
+    return;
+  }
+  el.innerHTML = data.map(r => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fff;border-radius:10px;margin-bottom:6px;border:1px solid #E8E3DB;">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--dark);">${r.promo}</div>
+        <div style="font-size:11px;color:var(--muted);">${r.descripcion}</div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:var(--terra);background:#FDF0EB;padding:4px 8px;border-radius:6px;">ACTIVO</div>
+    </div>`).join('');
 }
 
 function syncQR(){
@@ -944,13 +1125,44 @@ async function cobrar(){
   const m=parseFloat(document.getElementById('monto-cobro').value);
   if(!m||m<=0){showToast('Ingresa un monto válido',false);return;}
   try {
-    const nuevoSaldo=await cobrarSaldoDB(cliFoundData.id,m,baristaActual.nombre,baristaActual.sucursal);
-    showToast('Cobro: '+fmt(m)+' · Saldo: '+fmt(nuevoSaldo));
+    const res = await cobrarSaldoDB(cliFoundData.id, m, baristaActual.nombre, baristaActual.sucursal);
+    if(res.promo){
+      mostrarPromoModal(res.promo, cliFoundData.nombre);
+    } else {
+      showToast(`Cobro: ${fmt(m)} · +${res.ptsGanados} pts · Saldo: ${fmt(res.nuevoSaldo)}`);
+    }
     document.getElementById('monto-cobro').value='';
     document.getElementById('bus-cli').value='';
     document.getElementById('cli-found').style.display='none';
     cliFoundData=null;
   } catch(e){showToast(e.message,false);}
+}
+
+function mostrarPromoModal(promo, nombreCliente){
+  let m = document.getElementById('promo-modal');
+  if(!m){
+    m = document.createElement('div');
+    m.id = 'promo-modal';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(44,42,30,.95);z-index:9997;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;';
+    document.body.appendChild(m);
+  }
+  m.innerHTML = `
+    <div style="font-size:60px;margin-bottom:16px;animation:bounce .5s infinite alternate;">${promo.split(' ')[0]}</div>
+    <div style="font-size:12px;color:#9A9880;letter-spacing:.12em;margin-bottom:8px;">¡RECOMPENSA DESBLOQUEADA!</div>
+    <div style="font-size:24px;font-weight:700;color:#F2EDE4;margin-bottom:8px;">${promo}</div>
+    <div style="font-size:13px;color:#9A9880;margin-bottom:6px;">Para: ${nombreCliente}</div>
+    <button onclick="document.getElementById('promo-modal').style.display='none'" 
+      style="margin-top:20px;background:var(--terra);border:none;color:#fff;padding:14px 32px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">
+      ¡Entendido! 🎉
+    </button>`;
+  m.style.display = 'flex';
+  // Agregar animación bounce
+  if(!document.getElementById('bounce-style')){
+    const s = document.createElement('style');
+    s.id = 'bounce-style';
+    s.textContent = '@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}';
+    document.head.appendChild(s);
+  }
 }
 
 async function cargarS(){
@@ -983,16 +1195,59 @@ function prevBono(v){const m=parseFloat(v);document.getElementById('bono-prev2')
 function setM(m){metodoB=m;['ef','np'].forEach(x=>{const a=x===m,b=document.getElementById('met-'+x);b.style.background=a?'var(--terra)':'transparent';b.style.color=a?'#fff':'var(--light)';b.style.border=a?'1px solid var(--terra)':'1px solid #5A5E50';b.style.fontWeight=a?'700':'400';});}
 
 async function renderOps(){
-  if(!baristaActual)return;
-  const {data:ops}=await sb.from('wallet_movimientos').select('*').eq('barista',baristaActual.nombre).order('fecha',{ascending:false}).limit(20);
-  if(!ops)return;
-  const cobros=ops.filter(o=>o.tipo==='cobro');
-  const cargas=ops.filter(o=>o.tipo==='carga');
-  document.getElementById('op-cobros').textContent=cobros.length;
-  document.getElementById('op-cargas').textContent=cargas.length;
-  const el=document.getElementById('ops-lista');
-  if(!ops.length){el.innerHTML='<div style="padding:14px;font-size:12px;color:var(--muted);text-align:center;">Sin ops hoy</div>';return;}
-  el.innerHTML=ops.slice(0,15).map(o=>`<div class="row-i"><div><div style="font-size:12px;">${o.tipo==='carga'?'Carga':'Cobro'} · ${o.descripcion||''}</div><div style="font-size:10px;color:var(--muted);">${timeAgo(o.fecha)}</div></div><div style="font-size:12px;font-weight:700;color:${o.tipo==='carga'?'var(--green)':'var(--terra)'};">${o.tipo==='carga'?'+':'-'}${fmt(o.monto)}</div></div>`).join('');
+  if(!baristaActual) return;
+  const mes = new Date().toISOString().slice(0,7);
+
+  // Ops de hoy
+  const hoy = new Date().toISOString().slice(0,10);
+  const {data:ops} = await sb.from('wallet_movimientos').select('*').eq('barista',baristaActual.nombre).gte('fecha',hoy+'T00:00:00').order('fecha',{ascending:false});
+  if(ops){
+    document.getElementById('op-cobros').textContent = ops.filter(o=>o.tipo==='cobro').length;
+    document.getElementById('op-cargas').textContent = ops.filter(o=>o.tipo==='carga').length;
+    const el = document.getElementById('ops-lista');
+    el.innerHTML = ops.length ? ops.slice(0,15).map(o=>`<div class="row-i"><div><div style="font-size:12px;">${o.tipo==='carga'?'Carga':'Cobro'} · ${o.descripcion||''}</div><div style="font-size:10px;color:var(--muted);">${timeAgo(o.fecha)}</div></div><div style="font-size:12px;font-weight:700;color:${o.tipo==='carga'?'var(--green)':'var(--terra)'};">${o.tipo==='carga'?'+':'-'}${fmt(o.monto)}</div></div>`).join('') : '<div style="padding:14px;font-size:12px;color:var(--muted);text-align:center;">Sin ops hoy</div>';
+  }
+
+  // Comisiones del mes
+  const {data:coms} = await sb.from('wallet_comisiones').select('*').eq('barista',baristaActual.nombre).eq('mes',mes);
+  if(coms){
+    const porRecargas = coms.filter(c=>c.tipo==='recarga').reduce((s,c)=>s+parseFloat(c.comision),0);
+    const porActivaciones = coms.filter(c=>c.tipo==='activacion').reduce((s,c)=>s+parseFloat(c.comision),0);
+    const total = porRecargas + porActivaciones;
+    const numRecargas = coms.filter(c=>c.tipo==='recarga').length;
+    document.getElementById('com-recargas').textContent = fmt(porRecargas);
+    document.getElementById('com-activaciones').textContent = fmt(porActivaciones);
+    document.getElementById('com-total').textContent = fmt(total);
+    // Bono progress
+    const meta = numRecargas >= 40 ? 40 : 20;
+    const bono = numRecargas >= 40 ? 500 : 200;
+    const prog = Math.min((numRecargas / meta) * 100, 100);
+    document.getElementById('bono-label').textContent = `Meta: ${meta} recargas → $${bono} extra`;
+    document.getElementById('bono-count').textContent = `${Math.min(numRecargas,meta)}/${meta}`;
+    document.getElementById('bono-bar').style.width = prog + '%';
+    if(numRecargas >= 40) document.getElementById('bono-bar').style.background = '#3A6B42';
+  }
+
+  // Ranking todos los baristas del mes
+  const {data:ranking} = await sb.from('wallet_comisiones').select('barista,comision').eq('mes',mes);
+  if(ranking){
+    const totales = {};
+    ranking.forEach(r => { totales[r.barista] = (totales[r.barista]||0) + parseFloat(r.comision); });
+    const sorted = Object.entries(totales).sort((a,b)=>b[1]-a[1]);
+    const medals = ['👑','🥈','🥉'];
+    document.getElementById('ranking-lista').innerHTML = sorted.length ?
+      sorted.map(([nombre,total],i) => `
+        <div class="row-i" style="${nombre===baristaActual.nombre?'background:#2C2A1E;border-radius:8px;':''}">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">${medals[i]||`${i+1}.`}</span>
+            <div>
+              <div style="font-size:12px;font-weight:${nombre===baristaActual.nombre?'700':'400'};color:${nombre===baristaActual.nombre?'var(--terra)':'var(--light)'};">${nombre}${nombre===baristaActual.nombre?' (tú)':''}</div>
+            </div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:#3A6B42;">${fmt(total)}</div>
+        </div>`).join('') :
+      '<div style="padding:14px;font-size:12px;color:var(--muted);text-align:center;">Sin datos aún</div>';
+  }
 }
 
 // ══════════════════════════════════════════
