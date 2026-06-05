@@ -13,6 +13,7 @@
 <title>Che Che Wallet</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -370,7 +371,13 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
         <div class="inner-tab" onclick="bTab('ops',this)">Mis ops</div>
       </div>
       <div id="bt-cobrar">
-        <div class="card-olive"><div class="label-s" style="color:#9A9880;">Teléfono del cliente</div><input id="bus-cli" placeholder="55 1234 5678" type="tel" inputmode="numeric" style="width:100%;background:var(--dark);border:1px solid var(--light);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--beige);outline:none;margin-top:6px;font-family:monospace;" oninput="buscarC(this.value)"/></div>
+        <div class="card-olive">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="label-s" style="color:#9A9880;">Teléfono del cliente</div>
+            <button onclick="abrirScanner('cobrar')" style="background:var(--terra);border:none;border-radius:6px;padding:6px 10px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">📷 Escanear QR</button>
+          </div>
+          <input id="bus-cli" placeholder="55 1234 5678" type="tel" inputmode="numeric" style="width:100%;background:var(--dark);border:1px solid var(--light);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--beige);outline:none;margin-top:6px;font-family:monospace;" oninput="buscarC(this.value)"/>
+        </div>
         <div id="cli-found" style="display:none;">
           <div class="card-beige"><div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;font-weight:700;" id="cf-nombre">—</div><div style="font-size:10px;color:var(--muted);" id="cf-codigo">—</div></div><div style="text-align:right;"><div class="label-s">Saldo</div><div style="font-size:16px;font-weight:700;" id="cf-saldo">—</div></div></div></div>
           <div class="card-olive"><div class="label-s" style="color:#9A9880;">Monto</div><input id="monto-cobro" type="number" placeholder="0.00" style="width:100%;background:var(--dark);border:1px solid var(--light);border-radius:8px;padding:10px 12px;font-size:22px;font-weight:700;color:var(--beige);outline:none;margin-top:6px;"/></div>
@@ -379,7 +386,13 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
         <div id="cli-notfound" style="display:none;text-align:center;padding:20px;font-size:12px;color:var(--muted);">Cliente no encontrado</div>
       </div>
       <div id="bt-cargar" style="display:none;">
-        <div class="card-olive"><div class="label-s" style="color:#9A9880;">Teléfono del cliente</div><input id="car-cod" placeholder="55 1234 5678" type="tel" inputmode="numeric" style="width:100%;background:var(--dark);border:1px solid var(--light);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--beige);outline:none;margin-top:6px;font-family:monospace;" oninput="buscarCarga(this.value)"/></div>
+        <div class="card-olive">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="label-s" style="color:#9A9880;">Teléfono del cliente</div>
+            <button onclick="abrirScanner('cargar')" style="background:var(--terra);border:none;border-radius:6px;padding:6px 10px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">📷 Escanear QR</button>
+          </div>
+          <input id="car-cod" placeholder="55 1234 5678" type="tel" inputmode="numeric" style="width:100%;background:var(--dark);border:1px solid var(--light);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--beige);outline:none;margin-top:6px;font-family:monospace;" oninput="buscarCarga(this.value)"/>
+        </div>
         <div id="car-found" style="display:none;">
           <div class="card-beige"><div style="font-size:13px;font-weight:700;" id="car-nombre">—</div><div style="font-size:10px;color:var(--muted);">Saldo: <span id="car-saldo">—</span></div></div>
           <div class="card-olive"><div class="label-s" style="color:#9A9880;">Monto a cargar</div><input id="monto-carga" type="number" placeholder="0.00" style="width:100%;background:var(--dark);border:1px solid var(--light);border-radius:8px;padding:10px 12px;font-size:22px;font-weight:700;color:var(--beige);outline:none;margin-top:6px;" oninput="prevBono(this.value)"/><div style="font-size:11px;color:#E87A5A;margin-top:6px;min-height:16px;" id="bono-prev2"></div></div>
@@ -392,7 +405,13 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
       </div>
       <div id="bt-plan" style="display:none;">
         <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Verifica y canjea el café del día.</div>
-        <div class="card-olive"><div class="label-s" style="color:#9A9880;">Teléfono del cliente</div><input id="plan-bus" placeholder="55 1234 5678" type="tel" inputmode="numeric" style="width:100%;background:var(--dark);border:1px solid var(--light);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--beige);outline:none;margin-top:6px;font-family:monospace;" oninput="buscarPlan(this.value)"/></div>
+        <div class="card-olive">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="label-s" style="color:#9A9880;">Teléfono del cliente</div>
+            <button onclick="abrirScanner('plan')" style="background:var(--terra);border:none;border-radius:6px;padding:6px 10px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">📷 Escanear QR</button>
+          </div>
+          <input id="plan-bus" placeholder="55 1234 5678" type="tel" inputmode="numeric" style="width:100%;background:var(--dark);border:1px solid var(--light);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--beige);outline:none;margin-top:6px;font-family:monospace;" oninput="buscarPlan(this.value)"/>
+        </div>
         <div id="plan-found" style="display:none;">
           <div class="card-beige"><div style="font-size:13px;font-weight:700;" id="pf-nombre">—</div><div style="font-size:11px;color:var(--muted);" id="pf-plan">—</div></div>
           <div class="card-white" id="pf-bebidas"></div>
@@ -408,6 +427,14 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
       </div>
     </div>
   </div>
+</div>
+
+<!-- ══ SCANNER QR ══ -->
+<div id="scanner-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
+  <div style="color:#F2EDE4;font-size:13px;font-weight:700;margin-bottom:16px;letter-spacing:.08em;">ESCANEA EL QR DEL CLIENTE</div>
+  <div id="scanner-box" style="width:280px;height:280px;border-radius:16px;overflow:hidden;border:2px solid var(--terra);"></div>
+  <div style="color:#9A9880;font-size:11px;margin-top:12px;text-align:center;">Apunta la cámara al código QR</div>
+  <button onclick="cerrarScanner()" style="margin-top:20px;background:transparent;border:1px solid #5A5E50;color:var(--light);padding:10px 28px;border-radius:8px;font-size:13px;cursor:pointer;">Cancelar</button>
 </div>
 
 <!-- ══ ADMIN ══ -->
@@ -977,6 +1004,56 @@ function calcP(v){return v.activaciones*40+Math.floor(v.cargas/10);}
 document.addEventListener('DOMContentLoaded', async ()=>{
   await renderNotifsCli();
 });
+
+// ══════════════════════════════════════════
+// ESCÁNER QR — Barista
+// ══════════════════════════════════════════
+let scannerInstance = null;
+let scannerTab = null;
+
+function abrirScanner(tab){
+  scannerTab = tab;
+  const modal = document.getElementById('scanner-modal');
+  modal.style.display = 'flex';
+  if(scannerInstance){
+    scannerInstance.clear().catch(()=>{});
+    scannerInstance = null;
+  }
+  scannerInstance = new Html5Qrcode('scanner-box');
+  scannerInstance.start(
+    {facingMode: 'environment'},
+    {fps: 10, qrbox: {width: 220, height: 220}},
+    (decodedText) => {
+      const tel = decodedText.replace(/\D/g,'');
+      cerrarScanner();
+      if(scannerTab === 'cobrar'){
+        document.getElementById('bus-cli').value = tel;
+        buscarC(tel);
+      } else if(scannerTab === 'cargar'){
+        document.getElementById('car-cod').value = tel;
+        buscarCarga(tel);
+      } else if(scannerTab === 'plan'){
+        document.getElementById('plan-bus').value = tel;
+        buscarPlan(tel);
+      }
+      showToast('QR leído: ' + tel);
+    },
+    (err) => {}
+  ).catch(err => {
+    cerrarScanner();
+    showToast('No se pudo acceder a la cámara', false);
+  });
+}
+
+function cerrarScanner(){
+  document.getElementById('scanner-modal').style.display = 'none';
+  if(scannerInstance){
+    scannerInstance.stop().then(()=>{
+      scannerInstance.clear();
+      scannerInstance = null;
+    }).catch(()=>{ scannerInstance = null; });
+  }
+}
 
 // Service Worker
 if ('serviceWorker' in navigator) {
