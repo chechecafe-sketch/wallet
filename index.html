@@ -150,9 +150,22 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
       <svg style="width:220px;height:64px;margin-bottom:8px;"><use href="#logo-cheche" fill="#F2EDE4"/></svg>
       <div style="font-size:12px;color:#9A9880;margin-bottom:36px;">Tu monedero digital</div>
       <button class="btn-T" onclick="showReg()">Crear mi monedero</button>
-      <button class="btn-O" onclick="showPanel()">Ya tengo cuenta</button>
+      <button class="btn-O" onclick="showLogin()">Ya tengo cuenta</button>
     </div>
   </div>
+  <!-- Login cliente existente -->
+  <div id="cli-login" style="display:none;">
+    <div class="login-wrap">
+      <div style="font-size:10px;color:var(--light);letter-spacing:.12em;margin-bottom:6px;">BIENVENIDO DE VUELTA</div>
+      <svg style="width:130px;height:38px;margin-bottom:20px;"><use href="#logo-cheche" fill="#F2EDE4"/></svg>
+      <div class="label-s" style="color:#9A9880;margin-bottom:6px;">Tu número de teléfono</div>
+      <input class="input-dk" id="login-tel" placeholder="55 1234 5678" type="tel" inputmode="numeric" style="font-family:monospace;"/>
+      <button class="btn-T" onclick="loginCliente()">Entrar</button>
+      <div id="login-err" style="font-size:11px;color:var(--terra);margin-top:8px;text-align:center;display:none;">Número no encontrado</div>
+      <button onclick="showReg()" style="background:transparent;border:none;color:#9A9880;font-size:12px;margin-top:12px;cursor:pointer;">¿No tienes cuenta? Regístrate</button>
+    </div>
+  </div>
+
   <div id="cli-reg" style="display:none;">
     <div class="login-wrap">
       <div style="font-size:10px;color:var(--light);letter-spacing:.12em;margin-bottom:6px;">REGISTRO</div>
@@ -701,13 +714,24 @@ async function getAdminStatsDB(){
 // ══════════════════════════════════════════
 // CLIENTE — Flujo
 // ══════════════════════════════════════════
-function showReg(){document.getElementById('cli-splash').style.display='none';document.getElementById('cli-reg').style.display='block';}
+function showReg(){document.getElementById('cli-splash').style.display='none';document.getElementById('cli-login').style.display='none';document.getElementById('cli-reg').style.display='block';}
+function showLogin(){document.getElementById('cli-splash').style.display='none';document.getElementById('cli-login').style.display='block';}
+async function loginCliente(){
+  const tel=document.getElementById('login-tel').value.replace(/\D/g,'');
+  if(tel.length<10){showToast('Ingresa tu número completo',false);return;}
+  showLoader(true);
+  try {
+    const {data,error}=await sb.from('wallet_clientes').select('*').eq('telefono',tel).eq('activo',true).single();
+    if(error||!data){document.getElementById('login-err').style.display='block';return;}
+    cliActual=data;
+    document.getElementById('cli-login').style.display='none';
+    activarPanel();
+  } catch(e){showToast('Error al buscar cuenta',false);}
+  finally{showLoader(false);}
+}
 function showPanel(){
   if(cliActual) activarPanel();
-  else {
-    // Si no hay sesión, mostrar splash
-    document.getElementById('cli-splash').style.display='flex';
-  }
+  else showLogin();
 }
 
 function activarPanel(){
