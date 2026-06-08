@@ -513,6 +513,7 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
         <div class="inner-tab" onclick="aTab('notifs',this)">Notifs</div>
         <div class="inner-tab" onclick="aTab('com',this)">Comisiones</div>
         <div class="inner-tab" onclick="aTab('rank',this)">Ranking</div>
+        <div class="inner-tab" onclick="aTab('users',this)">Usuarios</div>
       </div>
       <div id="at-res">
         <div class="card-dark"><div class="label-s">Float total</div><div class="big-num" id="adm-float">$0</div><div style="display:flex;gap:8px;margin-top:10px;"><span class="pill-T" id="adm-afil">0</span><span class="pill-G" id="adm-planes">0 planes</span></div></div>
@@ -544,6 +545,37 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
           <div class="row-i"><div><div style="font-size:12px;">Bono meta</div><div style="font-size:10px;color:var(--muted);">30+ activaciones</div></div><div style="font-size:13px;font-weight:700;">$300</div></div>
         </div>
       </div>
+      <!-- Panel Usuarios Admin -->
+      <div id="at-users" style="display:none;">
+        <!-- Tabs sub -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;">
+          <button onclick="usrTab('clientes',this)" id="utab-clientes" style="flex:1;padding:8px;border-radius:8px;border:none;background:var(--terra);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Clientes</button>
+          <button onclick="usrTab('baristas',this)" id="utab-baristas" style="flex:1;padding:8px;border-radius:8px;border:1px solid #5A5E50;background:transparent;color:var(--light);font-size:11px;cursor:pointer;">Baristas</button>
+        </div>
+
+        <!-- Alta cliente -->
+        <div id="usr-clientes">
+          <div style="background:#1A1C14;border-radius:12px;padding:14px;margin-bottom:10px;">
+            <div style="font-size:10px;color:#9A9880;letter-spacing:.1em;margin-bottom:10px;">DAR DE ALTA CLIENTE</div>
+            <input class="input-dk" id="new-cli-nombre" placeholder="Nombre completo" style="margin-bottom:8px;"/>
+            <input class="input-dk" id="new-cli-tel" placeholder="Teléfono 10 dígitos" type="tel" inputmode="numeric" style="margin-bottom:8px;"/>
+            <input class="input-dk" id="new-cli-pin" placeholder="PIN 4 dígitos" type="password" inputmode="numeric" maxlength="4" style="margin-bottom:8px;font-size:20px;letter-spacing:6px;text-align:center;"/>
+            <input class="input-dk" id="new-cli-saldo" placeholder="Saldo inicial $0" type="number" style="margin-bottom:10px;"/>
+            <button onclick="altaCliente()" style="width:100%;background:var(--terra);border:none;color:#fff;padding:12px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">+ Dar de alta</button>
+          </div>
+
+          <!-- Lista clientes -->
+          <div style="font-size:10px;color:#9A9880;letter-spacing:.1em;margin-bottom:8px;">CLIENTES ACTIVOS</div>
+          <div id="admin-cli-cards"></div>
+        </div>
+
+        <!-- Baristas -->
+        <div id="usr-baristas" style="display:none;">
+          <div style="font-size:10px;color:#9A9880;letter-spacing:.1em;margin-bottom:8px;">BARISTAS Y ACCESOS</div>
+          <div id="admin-bar-cards"></div>
+        </div>
+      </div>
+
       <div id="at-rank" style="display:none;">
         <div class="card-beige" style="margin-bottom:12px;"><div style="font-size:11px;color:var(--muted);">Activaciones × 40 pts + cargas ÷ $10</div></div>
         <div class="card-white" id="rank-lista"></div>
@@ -639,9 +671,16 @@ let notifsCache  = [];
 // HELPERS
 // ══════════════════════════════════════════
 function fmt(n){return'$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function genFolio(tipo){
+  const now=new Date();
+  const fecha=now.toISOString().slice(0,10).replace(/-/g,'');
+  const rand=String(Math.floor(Math.random()*9000)+1000);
+  const prefix={carga:'REC',cobro:'COB',plan:'PLN',activacion:'ACT'}[tipo]||'TXN';
+  return prefix+'-'+fecha+'-'+rand;
+}
 function timeAgo(d){const m=Math.floor((Date.now()-new Date(d))/60000);if(m<1)return'ahora';if(m<60)return m+'m';if(m<1440)return Math.floor(m/60)+'h';return Math.floor(m/1440)+'d';}
 
-function genCodigo(num){return'CC-'+String(num).padStart(4,'0');}
+function genCodigo(num){return'cc'+String(num).padStart(2,'0');}
 
 function showToast(msg, ok=true){
   let t=document.getElementById('toast');
@@ -729,17 +768,18 @@ async function cargarSaldoDB(clienteId, monto, metodo, barista, sucursal, esActi
       nivel: nuevoNivel
     }).eq('id', clienteId);
 
+    const folioC = genFolio('carga');
     await sb.from('wallet_movimientos').insert({
       cliente_id:clienteId, tipo:'carga', monto,
-      descripcion:`Carga + bono ${fmt(bono)} (+${ptsGanados} pts x2)`, metodo, barista, sucursal
+      descripcion:`[${folioC}] Carga + bono ${fmt(bono)} (+${ptsGanados} pts x2)`, metodo, barista, sucursal
     });
+    return {nuevoSaldo, ptsGanados, folio:folioC};
 
     // Comisión barista
     const mes = new Date().toISOString().slice(0,7);
     const comision = monto * 0.05;
     await sb.from('wallet_comisiones').insert({barista, sucursal, tipo: esActivacion?'activacion':'recarga', monto_base:monto, comision, mes});
 
-    return {nuevoSaldo, ptsGanados};
   } finally { showLoader(false); }
 }
 
@@ -771,9 +811,10 @@ async function cobrarSaldoDB(clienteId, monto, barista, sucursal){
       nivel: nuevoNivel
     }).eq('id', clienteId);
 
+    const folioX = genFolio('cobro');
     await sb.from('wallet_movimientos').insert({
       cliente_id:clienteId, tipo:'cobro', monto,
-      descripcion:`Consumo en tienda (+${ptsGanados} pts)`, metodo:'monedero', barista, sucursal
+      descripcion:`[${folioX}] Consumo en tienda (+${ptsGanados} pts)`, metodo:'monedero', barista, sucursal
     });
 
     // Registrar comisión barista
@@ -1078,7 +1119,7 @@ async function activarPlan(){
 // ══════════════════════════════════════════
 function loginB(){
   const u=document.getElementById('b-user').value.trim(),p=document.getElementById('b-pass').value.trim();
-  const f=BARISTAS.find(b=>b.user===u&&b.pass===p);
+  const f=BARISTAS.find(b=>b.user===u&&b.pass===p&&b.activo!==false);
   if(f){baristaActual=f;document.getElementById('b-login').style.display='none';document.getElementById('b-panel').style.display='flex';document.getElementById('b-nombre').textContent=f.nombre;document.getElementById('b-suc').textContent='Sucursal '+f.sucursal;}
   else document.getElementById('b-err').style.display='block';
 }
@@ -1262,7 +1303,7 @@ function loginAdm(){
   } else document.getElementById('adm-err').style.display='block';
 }
 function logoutAdm(){admLoggedIn=false;document.getElementById('adm-login').style.display='block';document.getElementById('adm-panel').style.display='none';document.getElementById('adm-pass').value='';}
-function aTab(t,el){['res','notifs','com','rank'].forEach(x=>document.getElementById('at-'+x).style.display='none');document.getElementById('at-'+t).style.display='block';document.querySelectorAll('#adm-panel .inner-tab').forEach(e=>e.classList.remove('active'));el.classList.add('active');renderAdm();if(t==='notifs')renderNotifsEnv();}
+function aTab(t,el){['res','notifs','com','rank','users'].forEach(x=>document.getElementById('at-'+x).style.display='none');document.getElementById('at-'+t).style.display='block';document.querySelectorAll('#adm-panel .inner-tab').forEach(e=>e.classList.remove('active'));el.classList.add('active');renderAdm();if(t==='notifs')renderNotifsEnv();}
 
 async function renderAdm(){
   const {clientes,movHoy}=await getAdminStatsDB();
@@ -1295,6 +1336,110 @@ function calcP(v){return v.activaciones*40+Math.floor(v.cargas/10);}
 document.addEventListener('DOMContentLoaded', async ()=>{
   await renderNotifsCli();
 });
+
+// ══════════════════════════════════════════
+// ADMIN — GESTIÓN DE USUARIOS
+// ══════════════════════════════════════════
+
+function usrTab(tab, el){
+  ['clientes','baristas'].forEach(t=>{
+    document.getElementById('usr-'+t).style.display = t===tab?'block':'none';
+  });
+  document.querySelectorAll('#at-users button').forEach(b=>{
+    b.style.background='transparent';b.style.color='var(--light)';b.style.border='1px solid #5A5E50';b.style.fontWeight='400';
+  });
+  el.style.background='var(--terra)';el.style.color='#fff';el.style.border='none';el.style.fontWeight='700';
+  if(tab==='clientes') cargarClientesAdmin();
+  if(tab==='baristas') cargarBaristasAdmin();
+}
+
+async function cargarClientesAdmin(){
+  const {data} = await sb.from('wallet_clientes').select('*').eq('activo',true).order('fecha_reg',{ascending:false});
+  const el = document.getElementById('admin-cli-cards');
+  if(!data||!data.length){el.innerHTML='<div style="padding:14px;font-size:12px;color:var(--muted);text-align:center;">Sin clientes</div>';return;}
+  el.innerHTML = data.map(c=>`
+    <div style="background:#1A1C14;border-radius:10px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--beige);">${c.nombre}</div>
+          <div style="font-size:10px;color:#9A9880;">${c.codigo} · ${c.telefono}</div>
+        </div>
+        <div style="font-size:16px;font-weight:700;color:#3A6B42;">${fmt(c.saldo)}</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <input id="monto-adj-${c.id}" placeholder="$0" type="number" style="flex:1;background:#2C2A1E;border:1px solid #5A5E50;border-radius:6px;padding:7px 10px;font-size:12px;color:var(--beige);outline:none;"/>
+        <button onclick="ajustarSaldo(${c.id},'sumar')" style="background:#3A6B42;border:none;color:#fff;padding:7px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">+ Abonar</button>
+        <button onclick="ajustarSaldo(${c.id},'restar')" style="background:#B5522A;border:none;color:#fff;padding:7px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">− Descontar</button>
+      </div>
+    </div>`).join('');
+}
+
+async function ajustarSaldo(clienteId, operacion){
+  const input = document.getElementById('monto-adj-'+clienteId);
+  const monto = parseFloat(input.value);
+  if(!monto||monto<=0){showToast('Ingresa un monto válido',false);return;}
+  showLoader(true);
+  try {
+    const {data:cli} = await sb.from('wallet_clientes').select('saldo').eq('id',clienteId).single();
+    const actual = parseFloat(cli.saldo);
+    const nuevo = operacion==='sumar' ? actual+monto : Math.max(0, actual-monto);
+    const folio = genFolio(operacion==='sumar'?'carga':'cobro');
+    await sb.from('wallet_clientes').update({saldo:nuevo}).eq('id',clienteId);
+    await sb.from('wallet_movimientos').insert({
+      cliente_id:clienteId, tipo: operacion==='sumar'?'carga':'cobro',
+      monto, descripcion:`[${folio}] Ajuste manual Admin`, metodo:'admin', barista:'Admin', sucursal:'—'
+    });
+    showToast(`${folio} · ${operacion==='sumar'?'+':'-'}${fmt(monto)} aplicado`);
+    input.value='';
+    cargarClientesAdmin();
+  } catch(e){showToast('Error: '+e.message,false);}
+  finally{showLoader(false);}
+}
+
+async function altaCliente(){
+  const nombre = document.getElementById('new-cli-nombre').value.trim();
+  const tel = document.getElementById('new-cli-tel').value.replace(/\D/g,'');
+  const pin = document.getElementById('new-cli-pin').value.trim();
+  const saldo = parseFloat(document.getElementById('new-cli-saldo').value)||0;
+  if(!nombre){showToast('Escribe el nombre',false);return;}
+  if(tel.length<10){showToast('Teléfono de 10 dígitos',false);return;}
+  if(pin.length<4){showToast('PIN de 4 dígitos',false);return;}
+  showLoader(true);
+  try {
+    const {count} = await sb.from('wallet_clientes').select('*',{count:'exact',head:true});
+    const codigo = 'cc'+String((count||0)+1).padStart(2,'0');
+    await sb.from('wallet_clientes').insert({codigo,nombre,telefono:tel,pin,saldo,activo:true});
+    showToast('Cliente '+nombre+' dado de alta ✓');
+    document.getElementById('new-cli-nombre').value='';
+    document.getElementById('new-cli-tel').value='';
+    document.getElementById('new-cli-pin').value='';
+    document.getElementById('new-cli-saldo').value='';
+    cargarClientesAdmin();
+  } catch(e){showToast('Error: '+e.message,false);}
+  finally{showLoader(false);}
+}
+
+function cargarBaristasAdmin(){
+  const el = document.getElementById('admin-bar-cards');
+  el.innerHTML = BARISTAS.map((b,i)=>`
+    <div style="background:#1A1C14;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--beige);">${b.nombre}</div>
+        <div style="font-size:10px;color:#9A9880;">${b.user} · ${b.sucursal} · ${b.rol}</div>
+      </div>
+      <button onclick="toggleBarista(${i},this)" style="background:${b.activo===false?'#3A6B42':'#B5522A'};border:none;color:#fff;padding:7px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">
+        ${b.activo===false?'Activar':'Desactivar'}
+      </button>
+    </div>`).join('');
+}
+
+function toggleBarista(idx, btn){
+  const b = BARISTAS[idx];
+  b.activo = b.activo === false ? true : false;
+  btn.textContent = b.activo === false ? 'Activar' : 'Desactivar';
+  btn.style.background = b.activo === false ? '#3A6B42' : '#B5522A';
+  showToast(`${b.nombre} ${b.activo===false?'desactivado':'activado'}`);
+}
 
 // ══════════════════════════════════════════
 // ESCÁNER QR — Barista
