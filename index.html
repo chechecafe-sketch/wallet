@@ -394,6 +394,7 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
         <div class="inner-tab" onclick="bTab('cargar',this)">Cargar</div>
         <div class="inner-tab" onclick="bTab('plan',this)">Plan diario</div>
         <div class="inner-tab" onclick="bTab('ops',this)">Mis ops</div>
+        <div class="inner-tab" onclick="bTab('promos',this)">Promos</div>
       </div>
       <div id="bt-cobrar">
         <div class="card-olive">
@@ -445,6 +446,17 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
         </div>
         <div id="plan-noplan" style="display:none;text-align:center;padding:16px;font-size:12px;color:var(--muted);">Sin plan activo</div>
       </div>
+      <div id="bt-promos" style="display:none;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Escanea el QR de la promo del cliente para marcarla como canjeada.</div>
+        <button onclick="abrirScannerPromo()" style="width:100%;background:var(--terra);border:none;color:#fff;padding:14px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:16px;">
+          📷 Escanear QR de promo
+        </button>
+        <div class="section-t">Promos canjeadas hoy</div>
+        <div id="promos-canjeadas-lista" class="card-white">
+          <div style="padding:14px;font-size:12px;color:var(--muted);text-align:center;">Sin canjeos hoy</div>
+        </div>
+      </div>
+
       <div id="bt-ops" style="display:none;">
         <div class="grid2">
           <div class="mc dk"><div class="ml">Cobros hoy</div><div class="mv" id="op-cobros">0</div></div>
@@ -971,13 +983,67 @@ async function renderRecompensas(){
     return;
   }
   el.innerHTML = data.map(r => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fff;border-radius:10px;margin-bottom:6px;border:1px solid #E8E3DB;">
-      <div>
-        <div style="font-size:13px;font-weight:700;color:var(--dark);">${r.promo}</div>
-        <div style="font-size:11px;color:var(--muted);">${r.descripcion}</div>
+    <div style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;border:1px solid #E8E3DB;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--dark);">${r.promo}</div>
+          <div style="font-size:11px;color:var(--muted);">${r.descripcion}</div>
+        </div>
+        <div style="font-size:10px;font-weight:700;color:var(--terra);background:#FDF0EB;padding:4px 8px;border-radius:6px;">ACTIVO</div>
       </div>
-      <div style="font-size:10px;font-weight:700;color:var(--terra);background:#FDF0EB;padding:4px 8px;border-radius:6px;">ACTIVO</div>
+      <button onclick="verQRPromo(${r.id},'${r.promo.replace(/'/g,'').replace(/"/g,'')}','${r.descripcion.replace(/'/g,'').replace(/"/g,'')}',${r.id})"
+        style="width:100%;background:var(--terra);border:none;color:#fff;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">
+        📱 Mostrar QR para canjear
+      </button>
     </div>`).join('');
+}
+
+function verQRPromo(id, promo, desc, recompensaId){
+  let modal = document.getElementById('promo-qr-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'promo-qr-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(44,42,30,.97);z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;';
+    document.body.appendChild(modal);
+  }
+  // Payload del QR: JSON con info del canjeo
+  const payload = JSON.stringify({
+    tipo:'promo',
+    recompensa_id: recompensaId,
+    cliente: cliActual.nombre,
+    cliente_id: cliActual.id,
+    codigo: cliActual.codigo,
+    promo: promo,
+    ts: new Date().toISOString()
+  });
+  modal.innerHTML = `
+    <div style="font-size:11px;color:#9A9880;letter-spacing:.1em;margin-bottom:6px;">CANJEAR RECOMPENSA</div>
+    <div style="font-size:18px;font-weight:700;color:#F2EDE4;margin-bottom:4px;">${promo}</div>
+    <div style="font-size:12px;color:#9A9880;margin-bottom:16px;">${desc}</div>
+    <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;">
+      <div id="promo-qr-canvas" style="width:200px;height:200px;"></div>
+    </div>
+    <div style="font-size:11px;color:#9A9880;margin-bottom:6px;">Muéstraselo al barista</div>
+    <div style="font-size:10px;color:#5A5E50;margin-bottom:20px;">Válido una sola vez · ${cliActual.nombre} · ${cliActual.codigo}</div>
+    <button onclick="document.getElementById('promo-qr-modal').style.display='none'"
+      style="background:transparent;border:1px solid #5A5E50;color:var(--light);padding:12px 32px;border-radius:8px;font-size:13px;cursor:pointer;">
+      Cerrar
+    </button>`;
+  modal.style.display = 'flex';
+  // Generar QR con el payload
+  setTimeout(()=>{
+    const div = document.getElementById('promo-qr-canvas');
+    if(div && typeof QRCode !== 'undefined'){
+      div.innerHTML = '';
+      new QRCode(div,{
+        text: payload,
+        width:200, height:200,
+        colorDark:'#2C2A1E',
+        colorLight:'#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+  },100);
 }
 
 function syncQR(){
@@ -1124,7 +1190,7 @@ function loginB(){
   else document.getElementById('b-err').style.display='block';
 }
 function logoutB(){baristaActual=null;document.getElementById('b-login').style.display='block';document.getElementById('b-panel').style.display='none';document.getElementById('b-user').value='';document.getElementById('b-pass').value='';}
-function bTab(t,el){['cobrar','cargar','plan','ops'].forEach(x=>document.getElementById('bt-'+x).style.display='none');document.getElementById('bt-'+t).style.display='block';document.querySelectorAll('#b-panel .inner-tab').forEach(e=>e.classList.remove('active'));el.classList.add('active');if(t==='ops')renderOps();}
+function bTab(t,el){['cobrar','cargar','plan','ops','promos'].forEach(x=>document.getElementById('bt-'+x).style.display='none');document.getElementById('bt-'+t).style.display='block';document.querySelectorAll('#b-panel .inner-tab').forEach(e=>e.classList.remove('active'));el.classList.add('active');if(t==='ops')renderOps();}
 
 let cliFoundData=null, carFoundData=null, planFoundData=null;
 
@@ -1212,13 +1278,67 @@ async function cargarS(){
   if(!m||m<=0){showToast('Ingresa un monto válido',false);return;}
   const metodoTexto=metodoB==='ef'?'efectivo':'netpay';
   try {
-    const nuevoSaldo=await cargarSaldoDB(carFoundData.id,m,metodoTexto,baristaActual.nombre,baristaActual.sucursal);
-    showToast('Carga: '+fmt(m)+' + bono · Saldo: '+fmt(nuevoSaldo));
+    const res = await cargarSaldoDB(carFoundData.id,m,metodoTexto,baristaActual.nombre,baristaActual.sucursal);
+    // Actualizar saldo visible en pantalla barista inmediatamente
+    document.getElementById('car-saldo').textContent = fmt(res.nuevoSaldo);
+    mostrarConfirmacionCarga(carFoundData.nombre, m, res.nuevoSaldo, res.folio, res.ptsGanados);
     document.getElementById('monto-carga').value='';
-    document.getElementById('car-cod').value='';
-    document.getElementById('car-found').style.display='none';
-    carFoundData=null;
   } catch(e){showToast(e.message,false);}
+}
+
+function mostrarConfirmacionCarga(nombre, monto, nuevoSaldo, folio, pts){
+  let modal = document.getElementById('carga-confirm');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'carga-confirm';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(44,42,30,.96);z-index:9997;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div style="font-size:52px;margin-bottom:12px;">✅</div>
+    <div style="font-size:10px;color:#9A9880;letter-spacing:.12em;margin-bottom:6px;">CARGA EXITOSA</div>
+    <div style="font-size:28px;font-weight:700;color:#F2EDE4;margin-bottom:4px;">+${fmt(monto)}</div>
+    <div style="font-size:13px;color:#9A9880;margin-bottom:20px;">Para: ${nombre}</div>
+    <div style="background:#2C2A1E;border-radius:12px;padding:16px;width:100%;max-width:300px;margin-bottom:20px;text-align:left;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:12px;color:#9A9880;">Nuevo saldo</span>
+        <span style="font-size:14px;font-weight:700;color:#3A6B42;">${fmt(nuevoSaldo)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:12px;color:#9A9880;">Puntos ganados</span>
+        <span style="font-size:14px;font-weight:700;color:#C9A84C;">+${pts||0} pts ×2 🌟</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid #3A3D2E;">
+        <span style="font-size:11px;color:#9A9880;">Folio</span>
+        <span style="font-size:11px;font-family:monospace;color:#F2EDE4;">${folio||'—'}</span>
+      </div>
+    </div>
+    <button onclick="cerrarConfirmacionCarga()"
+      style="background:var(--terra);border:none;color:#fff;padding:14px 48px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">
+      Listo ✓
+    </button>`;
+  modal.style.display = 'flex';
+}
+
+function cerrarConfirmacionCarga(){
+  const modal = document.getElementById('carga-confirm');
+  if(modal) modal.style.display = 'none';
+  document.getElementById('car-cod').value = '';
+  document.getElementById('car-found').style.display = 'none';
+  carFoundData = null;
+  // Refrescar saldo del cliente si tiene sesión abierta
+  if(cliActual) refrescarSaldoCliente();
+}
+
+async function refrescarSaldoCliente(){
+  const {data} = await sb.from('wallet_clientes').select('*').eq('id',cliActual.id).single();
+  if(data){
+    cliActual = data;
+    if(document.getElementById('saldo-display'))
+      document.getElementById('saldo-display').textContent = fmt(data.saldo);
+    renderPuntos();
+    renderMovs();
+  }
 }
 
 async function canjearPlan(){
@@ -1464,6 +1584,118 @@ function toggleBarista(idx, btn){
 // ══════════════════════════════════════════
 let scannerInstance = null;
 let scannerTab = null;
+
+// ══════════════════════════════════════════
+// SCANNER PROMOS — Barista canjea promo del cliente
+// ══════════════════════════════════════════
+function abrirScannerPromo(){
+  let modal = document.getElementById('scanner-modal');
+  modal.style.display = 'flex';
+  if(scannerInstance){scannerInstance.clear().catch(()=>{});scannerInstance=null;}
+  scannerInstance = new Html5Qrcode('scanner-box');
+  scannerInstance.start(
+    {facingMode:'environment'},
+    {fps:10, qrbox:{width:220,height:220}},
+    async (decodedText) => {
+      cerrarScanner();
+      try {
+        const data = JSON.parse(decodedText);
+        if(data.tipo !== 'promo'){showToast('QR inválido — no es una promo',false);return;}
+        await canjearPromoQR(data);
+      } catch(e){showToast('QR no reconocido',false);}
+    },
+    ()=>{}
+  ).catch(()=>{cerrarScanner();showToast('No se pudo acceder a la cámara',false);});
+}
+
+async function canjearPromoQR(data){
+  showLoader(true);
+  try {
+    // Verificar que la promo existe y no fue usada
+    const {data:promo, error} = await sb.from('wallet_recompensas')
+      .select('*').eq('id',data.recompensa_id).eq('usado',false).single();
+    if(error||!promo){showToast('Promo ya canjeada o inválida',false);return;}
+
+    // Marcar como canjeada
+    const folio = genFolio('cobro');
+    await sb.from('wallet_recompensas').update({
+      usado: true,
+      fecha_uso: new Date().toISOString()
+    }).eq('id', promo.id);
+
+    // Registrar en movimientos
+    await sb.from('wallet_movimientos').insert({
+      cliente_id: promo.cliente_id,
+      tipo: 'cafe-plan',
+      monto: 0,
+      descripcion: `[${folio}] Canjeo promo: ${promo.promo}`,
+      metodo: 'promo',
+      barista: baristaActual.nombre,
+      sucursal: baristaActual.sucursal
+    });
+
+    // Mostrar confirmación al barista
+    mostrarConfirmacionPromo(data.cliente, promo.promo, promo.descripcion, folio, baristaActual.sucursal);
+    cargarPromosCanjeasHoy();
+  } catch(e){showToast('Error al canjear: '+e.message,false);}
+  finally{showLoader(false);}
+}
+
+function mostrarConfirmacionPromo(cliente, promo, desc, folio, sucursal){
+  let modal = document.getElementById('promo-confirm');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'promo-confirm';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(44,42,30,.96);z-index:9997;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;';
+    document.body.appendChild(modal);
+  }
+  const hora = new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  modal.innerHTML = `
+    <div style="font-size:52px;margin-bottom:12px;">🎁</div>
+    <div style="font-size:10px;color:#9A9880;letter-spacing:.12em;margin-bottom:6px;">PROMO CANJEADA</div>
+    <div style="font-size:20px;font-weight:700;color:#F2EDE4;margin-bottom:4px;">${promo}</div>
+    <div style="font-size:12px;color:#9A9880;margin-bottom:20px;">${desc}</div>
+    <div style="background:#2C2A1E;border-radius:12px;padding:16px;width:100%;max-width:300px;margin-bottom:20px;text-align:left;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:11px;color:#9A9880;">Cliente</span>
+        <span style="font-size:12px;font-weight:700;color:#F2EDE4;">${cliente}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:11px;color:#9A9880;">Sucursal</span>
+        <span style="font-size:12px;color:#F2EDE4;">${sucursal}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:11px;color:#9A9880;">Hora</span>
+        <span style="font-size:12px;color:#F2EDE4;">${hora}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid #3A3D2E;">
+        <span style="font-size:11px;color:#9A9880;">Folio</span>
+        <span style="font-size:11px;font-family:monospace;color:#F2EDE4;">${folio}</span>
+      </div>
+    </div>
+    <button onclick="document.getElementById('promo-confirm').style.display='none'"
+      style="background:var(--terra);border:none;color:#fff;padding:14px 48px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">
+      Listo ✓
+    </button>`;
+  modal.style.display = 'flex';
+}
+
+async function cargarPromosCanjeasHoy(){
+  const hoy = new Date().toISOString().slice(0,10);
+  const {data} = await sb.from('wallet_movimientos')
+    .select('*').eq('barista',baristaActual.nombre).eq('tipo','cafe-plan').gte('fecha',hoy+'T00:00:00').order('fecha',{ascending:false});
+  const el = document.getElementById('promos-canjeadas-lista');
+  if(!el) return;
+  if(!data||!data.length){el.innerHTML='<div style="padding:14px;font-size:12px;color:var(--muted);text-align:center;">Sin canjeos hoy</div>';return;}
+  el.innerHTML = data.map(m=>`
+    <div class="row-i">
+      <div>
+        <div style="font-size:12px;">${m.descripcion.replace(/\[.*?\]\s/,'')}</div>
+        <div style="font-size:10px;color:var(--muted);">${timeAgo(m.fecha)} · ${m.sucursal}</div>
+      </div>
+      <div style="font-size:10px;font-family:monospace;color:var(--muted);">${m.descripcion.match(/\[(.*?)\]/)?.[1]||''}</div>
+    </div>`).join('');
+}
 
 function abrirScanner(tab){
   scannerTab = tab;
