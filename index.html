@@ -119,7 +119,7 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
 <div class="nav">
   <button class="nav-btn active" onclick="showScreen('cliente')">Cliente</button>
   <button class="nav-btn" onclick="showScreen('qr')">Mi QR</button>
-  <button class="nav-btn" onclick="showScreen('plan')">Plan <span class="badge">3</span></button>
+  <button class="nav-btn" onclick="showScreen('plan')" style="display:none;">Plan</button>
   <button class="nav-btn" onclick="showScreen('barista')">Barista</button>
   <button class="nav-btn" onclick="showScreen('admin')">Admin</button>
 </div>
@@ -218,7 +218,7 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
       <div style="width:34px;height:34px;border-radius:50%;background:var(--olive);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--light);" id="avatar">?</div>
     </div>
     <div class="scroll-area" style="padding:14px 16px;">
-      <div id="plan-banner" style="display:none;" class="card-green">
+      <div id="plan-banner" style="display:none!important;" class="card-green">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div><div style="font-size:11px;font-weight:700;color:var(--green3);" id="plan-banner-nombre">—</div><div style="font-size:10px;color:#6B9E6B;" id="plan-banner-hoy">—</div></div>
           <div style="font-size:10px;color:var(--green3);cursor:pointer;font-weight:700;" onclick="showScreen('plan')">Ver →</div>
@@ -233,7 +233,7 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
         </div>
       </div>
       <button class="btn-T" onclick="showScreen('qr')">Mostrar QR para pagar</button>
-      <button class="btn-O" onclick="showScreen('plan')">+ Cargar saldo · Ver plan</button>
+      <!-- Botón plan oculto temporalmente -->
       <!-- Puntos y nivel -->
       <div class="card-beige" id="puntos-wrap" style="margin-bottom:10px;"></div>
       <!-- Recompensas activas -->
@@ -266,7 +266,7 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
       <div class="label-s" style="margin-bottom:4px;">Saldo disponible</div>
       <div style="font-size:26px;font-weight:700;color:var(--dark);" id="saldo-qr">$0.00</div>
     </div>
-    <div id="plan-qr" style="display:none;" class="card-white">
+    <div id="plan-qr" style="display:none!important;" class="card-white">
       <div class="row-i"><div style="font-size:12px;" id="plan-qr-nombre">—</div><div style="font-size:11px;font-weight:700;" id="plan-qr-status"></div></div>
     </div>
     <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:8px;">Muestra este código al barista en caja</div>
@@ -1422,15 +1422,33 @@ async function altaCliente(){
 function cargarBaristasAdmin(){
   const el = document.getElementById('admin-bar-cards');
   el.innerHTML = BARISTAS.map((b,i)=>`
-    <div style="background:#1A1C14;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <div style="font-size:13px;font-weight:700;color:var(--beige);">${b.nombre}</div>
-        <div style="font-size:10px;color:#9A9880;">${b.user} · ${b.sucursal} · ${b.rol}</div>
+    <div style="background:#1A1C14;border-radius:10px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--beige);">${b.nombre}</div>
+          <div style="font-size:10px;color:#9A9880;">${b.user} · ${b.sucursal} · ${b.rol}</div>
+        </div>
+        <button onclick="toggleBarista(${i},this)" style="background:${b.activo===false?'#3A6B42':'#B5522A'};border:none;color:#fff;padding:7px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">
+          ${b.activo===false?'Activar':'Desactivar'}
+        </button>
       </div>
-      <button onclick="toggleBarista(${i},this)" style="background:${b.activo===false?'#3A6B42':'#B5522A'};border:none;color:#fff;padding:7px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">
-        ${b.activo===false?'Activar':'Desactivar'}
-      </button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input id="pass-${i}" placeholder="Nueva contraseña" type="text"
+          style="flex:1;background:#2C2A1E;border:1px solid #5A5E50;border-radius:6px;padding:7px 10px;font-size:12px;color:var(--beige);outline:none;font-family:monospace;"/>
+        <button onclick="cambiarPass(${i})" style="background:#4A5240;border:none;color:#fff;padding:7px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">
+          Cambiar
+        </button>
+      </div>
     </div>`).join('');
+}
+
+function cambiarPass(idx){
+  const input = document.getElementById('pass-'+idx);
+  const nueva = input.value.trim();
+  if(!nueva || nueva.length < 4){showToast('Mínimo 4 caracteres',false);return;}
+  BARISTAS[idx].pass = nueva;
+  input.value = '';
+  showToast('Contraseña de '+BARISTAS[idx].nombre+' actualizada ✓');
 }
 
 function toggleBarista(idx, btn){
