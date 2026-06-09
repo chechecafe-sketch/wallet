@@ -184,15 +184,20 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
         <button class="btn-T" onclick="rs2()">Continuar</button>
       </div>
       <div id="rs2" style="display:none;">
-        <div style="font-size:13px;color:var(--light);margin-bottom:14px;">¿Cuánto cargas para estrenar?</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;" id="montos-grid">
-          <button onclick="selMonto(200,this)" style="padding:14px;border-radius:10px;border:1px solid #5A5E50;background:var(--olive2);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">$200</button>
-          <button onclick="selMonto(500,this)" style="padding:14px;border-radius:10px;border:1px solid #5A5E50;background:var(--olive2);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">$500</button>
-          <button onclick="selMonto(1000,this)" style="padding:14px;border-radius:10px;border:1px solid #5A5E50;background:var(--olive2);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">$1,000</button>
-          <button onclick="selMonto(0,this)" style="padding:14px;border-radius:10px;border:1px solid #5A5E50;background:var(--olive2);color:#fff;font-size:13px;cursor:pointer;">Después</button>
+        <div style="background:#1A1C14;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center;">
+          <div style="font-size:28px;margin-bottom:6px;">☕</div>
+          <div style="font-size:13px;color:#F2EDE4;font-weight:600;margin-bottom:4px;">¡Ya casi!</div>
+          <div style="font-size:11px;color:#9A9880;line-height:1.6;">Dile al barista cuánto quieres cargar<br/>y él lo procesará en caja.</div>
         </div>
+        <div class="label-s" style="margin-bottom:6px;">Monto que quieres cargar (mín. $50)</div>
+        <input class="input-dk" id="monto-propuesta" placeholder="$150" type="number" min="50"
+          style="font-size:22px;text-align:center;margin-bottom:6px;"
+          oninput="prevBonoReg(this.value)"/>
         <div style="font-size:11px;color:#E87A5A;text-align:center;margin-bottom:14px;min-height:16px;" id="bono-prev"></div>
-        <button class="btn-T" onclick="rs3()">Confirmar</button>
+        <div style="background:#2C2A1E;border-radius:10px;padding:12px;margin-bottom:14px;">
+          <div style="font-size:11px;color:#9A9880;text-align:center;">🔒 El barista procesa el pago en caja — sin su aprobación no se activa el saldo</div>
+        </div>
+        <button class="btn-T" onclick="rs3()">Solicitar activación</button>
         <button class="btn-D" onclick="rs1back()">Atrás</button>
       </div>
       <div id="rs3" style="display:none;text-align:center;">
@@ -784,7 +789,9 @@ async function cobrarSaldoDB(clienteId, monto, barista, sucursal){
   showLoader(true);
   try {
     const {data:cli}=await sb.from('wallet_clientes').select('*').eq('id',clienteId).single();
-    if(parseFloat(cli.saldo)<monto) throw new Error('Saldo insuficiente');
+    const congelado = parseFloat(cli.saldo_congelado||0);
+    const disponible = parseFloat(cli.saldo) - congelado;
+    if(disponible<monto) throw new Error(`Saldo insuficiente (disponible: ${fmt(disponible)})`);
     const nuevoSaldo = parseFloat(cli.saldo) - monto;
 
     // Calcular puntos ganados (multiplicador por nivel)
@@ -922,6 +929,7 @@ function activarPanel(){
   renderNotifsCli();
   renderPuntos();
   renderRecompensas();
+  iniciarRefresh();
   if(cliActual.plan){
     const b=document.getElementById('plan-banner');
     b.style.display='block';
@@ -1058,7 +1066,8 @@ function syncQR(){
 
 function rs2(){if(!document.getElementById('reg-nombre').value.trim()){showToast('Escribe tu nombre',false);return;}const telVal=document.getElementById('reg-tel').value.replace(/\D/g,'');if(telVal.length<10){showToast('Ingresa un teléfono de 10 dígitos',false);return;}const pinVal=document.getElementById('reg-pin').value.trim();if(pinVal.length<4){showToast('Tu PIN debe tener 4 dígitos',false);return;}document.getElementById('rs1').style.display='none';document.getElementById('rs2').style.display='block';document.getElementById('sd1').classList.remove('on');document.getElementById('sd2').classList.add('on');}
 function rs1back(){document.getElementById('rs2').style.display='none';document.getElementById('rs1').style.display='block';document.getElementById('sd2').classList.remove('on');document.getElementById('sd1').classList.add('on');}
-function selMonto(m,btn){montoSel=m;document.querySelectorAll('#montos-grid button').forEach(b=>{b.style.border='1px solid #5A5E50';b.style.background='var(--olive2)';});btn.style.border='1px solid var(--terra)';btn.style.background='var(--terra2)';document.getElementById('bono-prev').textContent=m>0?'Con bono 10% recibes '+fmt(m*1.1):'';}
+function selMonto(m,btn){montoSel=m;}
+function prevBonoReg(v){const m=parseFloat(v);montoSel=m||0;document.getElementById('bono-prev').textContent=m>=50?'Con bono 10% recibirás '+fmt(m*1.1):m>0?'Mínimo $50':'';}
 
 async function rs3(){
   const n=document.getElementById('reg-nombre').value.trim();
@@ -1738,6 +1747,36 @@ function cerrarScanner(){
       scannerInstance = null;
     }).catch(()=>{ scannerInstance = null; });
   }
+}
+
+// ══════════════════════════════════════════
+// REFRESH AUTOMÁTICO DE SALDO
+// ══════════════════════════════════════════
+let refreshInterval = null;
+
+function iniciarRefresh(){
+  if(refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(async ()=>{
+    if(!cliActual) return;
+    const {data} = await sb.from('wallet_clientes').select('saldo,puntos,puntos_totales,nivel,cafe_hoy,plan').eq('id',cliActual.id).single();
+    if(data){
+      const saldoAnterior = cliActual.saldo;
+      cliActual = {...cliActual, ...data};
+      // Actualizar UI solo si cambió algo
+      if(document.getElementById('saldo-display'))
+        document.getElementById('saldo-display').textContent = fmt(data.saldo);
+      // Animación si subió el saldo
+      if(parseFloat(data.saldo) > parseFloat(saldoAnterior)){
+        const el = document.getElementById('saldo-display');
+        if(el){ el.style.color='#3A6B42'; setTimeout(()=>el.style.color='',1000); }
+      }
+      renderPuntos();
+    }
+  }, 3000); // cada 3 segundos
+}
+
+function detenerRefresh(){
+  if(refreshInterval){ clearInterval(refreshInterval); refreshInterval=null; }
 }
 
 // Service Worker
