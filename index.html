@@ -609,30 +609,8 @@ const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 // CONSTANTES
 // ══════════════════════════════════════════
 const ADMIN_PASS = 'chechis_888';
-const BARISTAS = [
-  // Santa María la Ribera
-  {user:'IC01',   pass:'ic762',        nombre:'Isaac Cruz',          sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'mm02',   pass:'mm482',        nombre:'Mariana Mangas',      sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'km03',   pass:'km974',        nombre:'Karla Mangas',        sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'ma04',   pass:'ma925',        nombre:'Marcelo Amador',      sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'rt05',   pass:'kl864',        nombre:'Rolando Trejo',       sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'cab06',  pass:'ca069',        nombre:'Carol Aguilar',       sucursal:'Santa María la Ribera', rol:'Barista'},
-  {user:'cj007',  pass:'elmasvergas',  nombre:'Clemente Jacques',    sucursal:'Santa María la Ribera', rol:'Barista'},
-  // Studio
-  {user:'mmo01',  pass:'MM#5r6t',      nombre:'Monserrat Machorro',  sucursal:'Studio',                rol:'Studio'},
-  {user:'vru02',  pass:'VR#2q9s',      nombre:'Violeta Ruiseñor',    sucursal:'Studio',                rol:'Studio'},
-  {user:'cga03',  pass:'CG#8j1v',      nombre:'Celic García',        sucursal:'Studio',                rol:'Studio'},
-  // Tabacalera
-  {user:'mv08',   pass:'MV#4k2p',      nombre:'Miriam Valentino',    sucursal:'Tabacalera',            rol:'Barista'},
-  {user:'gh09',   pass:'GH#7n5r',      nombre:'Giovanni Huerta',     sucursal:'Tabacalera',            rol:'Barista'},
-  {user:'lv10',   pass:'LV#3m8w',      nombre:'Lizbeth Vargas',      sucursal:'Tabacalera',            rol:'Barista'},
-  {user:'me11',   pass:'ME#6j1t',      nombre:'Miguel Escobar',      sucursal:'Tabacalera',            rol:'Barista'},
-  {user:'eo12',   pass:'EO#9s4v',      nombre:'Eliseo Oropeza',      sucursal:'Tabacalera',            rol:'Barista'},
-  // Admin
-  {user:'lg001',  pass:'LG#9x2k',      nombre:'Luis Garinian',       sucursal:'Corporativo',           rol:'Admin'},
-  {user:'fh002',  pass:'FH#7m4p',      nombre:'Fernanda Hughes',     sucursal:'Corporativo',           rol:'Admin'},
-  {user:'vs003',  pass:'VS#3n8w',      nombre:'Victoria Santamaría', sucursal:'Corporativo',           rol:'Admin'},
-];
+// Baristas cargados desde Supabase — ver wallet_baristas
+let BARISTAS = [];
 const PROMOS = [
   {id:'cafe26',    label:'☕ Café del día',      desc:'Cualquier café del día por $26',        valor:'$26',   rareza:'comun'},
   {id:'pancafe',   label:'🥐 Pan + Café',         desc:'Pan de la casa + café por $80',         valor:'$80',   rareza:'comun'},
@@ -1189,11 +1167,21 @@ async function activarPlan(){
 // ══════════════════════════════════════════
 // BARISTA
 // ══════════════════════════════════════════
-function loginB(){
-  const u=document.getElementById('b-user').value.trim(),p=document.getElementById('b-pass').value.trim();
-  const f=BARISTAS.find(b=>b.user===u&&b.pass===p&&b.activo!==false);
-  if(f){baristaActual=f;document.getElementById('b-login').style.display='none';document.getElementById('b-panel').style.display='flex';document.getElementById('b-nombre').textContent=f.nombre;document.getElementById('b-suc').textContent='Sucursal '+f.sucursal;}
-  else document.getElementById('b-err').style.display='block';
+async function loginB(){
+  const u=document.getElementById('b-user').value.trim();
+  const p=document.getElementById('b-pass').value.trim();
+  if(!u||!p){document.getElementById('b-err').style.display='block';return;}
+  showLoader(true);
+  try {
+    const {data,error}=await sb.from('wallet_baristas').select('*').eq('user_id',u).eq('password',p).eq('activo',true).single();
+    if(error||!data){document.getElementById('b-err').style.display='block';return;}
+    baristaActual={user:data.user_id,pass:data.password,nombre:data.nombre,sucursal:data.sucursal,rol:data.rol,id:data.id};
+    document.getElementById('b-login').style.display='none';
+    document.getElementById('b-panel').style.display='flex';
+    document.getElementById('b-nombre').textContent=data.nombre;
+    document.getElementById('b-suc').textContent='Sucursal '+data.sucursal;
+  } catch(e){document.getElementById('b-err').style.display='block';}
+  finally{showLoader(false);}
 }
 function logoutB(){baristaActual=null;document.getElementById('b-login').style.display='block';document.getElementById('b-panel').style.display='none';document.getElementById('b-user').value='';document.getElementById('b-pass').value='';}
 function bTab(t,el){['cobrar','cargar','plan','ops','promos'].forEach(x=>document.getElementById('bt-'+x).style.display='none');document.getElementById('bt-'+t).style.display='block';document.querySelectorAll('#b-panel .inner-tab').forEach(e=>e.classList.remove('active'));el.classList.add('active');if(t==='ops')renderOps();}
@@ -1545,9 +1533,12 @@ async function altaCliente(){
   finally{showLoader(false);}
 }
 
-function cargarBaristasAdmin(){
+async function cargarBaristasAdmin(){
+  const {data:baristas} = await sb.from('wallet_baristas').select('*').order('sucursal');
+  if(!baristas) return;
+  BARISTAS = baristas.map(b=>({user:b.user_id,pass:b.password,nombre:b.nombre,sucursal:b.sucursal,rol:b.rol,activo:b.activo,id:b.id}));
   const el = document.getElementById('admin-bar-cards');
-  el.innerHTML = BARISTAS.map((b,i)=>`
+  el.innerHTML = baristas.map((b,i)=>`
     <div style="background:#1A1C14;border-radius:10px;padding:12px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <div>
@@ -1568,21 +1559,23 @@ function cargarBaristasAdmin(){
     </div>`).join('');
 }
 
-function cambiarPass(idx){
+async function cambiarPass(idx){
   const input = document.getElementById('pass-'+idx);
   const nueva = input.value.trim();
   if(!nueva || nueva.length < 4){showToast('Mínimo 4 caracteres',false);return;}
-  BARISTAS[idx].pass = nueva;
+  const b = BARISTAS[idx];
+  await sb.from('wallet_baristas').update({password:nueva}).eq('user_id',b.user);
   input.value = '';
-  showToast('Contraseña de '+BARISTAS[idx].nombre+' actualizada ✓');
+  showToast('Contraseña de '+b.nombre+' actualizada ✓');
+  cargarBaristasAdmin();
 }
 
-function toggleBarista(idx, btn){
+async function toggleBarista(idx, btn){
   const b = BARISTAS[idx];
-  b.activo = b.activo === false ? true : false;
-  btn.textContent = b.activo === false ? 'Activar' : 'Desactivar';
-  btn.style.background = b.activo === false ? '#3A6B42' : '#B5522A';
-  showToast(`${b.nombre} ${b.activo===false?'desactivado':'activado'}`);
+  const nuevoEstado = b.activo === false ? true : false;
+  await sb.from('wallet_baristas').update({activo:nuevoEstado}).eq('user_id',b.user);
+  showToast(`${b.nombre} ${nuevoEstado?'activado':'desactivado'}`);
+  cargarBaristasAdmin();
 }
 
 // ══════════════════════════════════════════
