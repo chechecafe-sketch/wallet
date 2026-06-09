@@ -417,6 +417,10 @@ html,body{height:100%;background:var(--beige);font-family:system-ui,-apple-syste
         <div id="cli-notfound" style="display:none;text-align:center;padding:20px;font-size:12px;color:var(--muted);">Cliente no encontrado</div>
       </div>
       <div id="bt-cargar" style="display:none;">
+        <!-- Botón registrar cliente nuevo desde barista -->
+        <button onclick="mostrarRegBarista()" style="width:100%;background:#3A6B42;border:none;color:#fff;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px;">
+          ➕ Registrar cliente nuevo
+        </button>
         <div class="card-olive">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div class="label-s" style="color:#9A9880;">Teléfono del cliente</div>
@@ -1193,7 +1197,8 @@ async function loginB(){
   finally{showLoader(false);}
 }
 function logoutB(){baristaActual=null;document.getElementById('b-login').style.display='block';document.getElementById('b-panel').style.display='none';document.getElementById('b-user').value='';document.getElementById('b-pass').value='';}
-function bTab(t,el){['cobrar','cargar','plan','ops','promos'].forEach(x=>document.getElementById('bt-'+x).style.display='none');document.getElementById('bt-'+t).style.display='block';document.querySelectorAll('#b-panel .inner-tab').forEach(e=>e.classList.remove('active'));el.classList.add('active');if(t==='ops')renderOps();}
+function bTab(t,el){['cobrar','cargar','plan','ops','promos'].forEach(x=>document.getElementById('bt-'+x).style.display='none');
+  if(t==='ops') iniciarRefreshOps(); else detenerRefreshOps();document.getElementById('bt-'+t).style.display='block';document.querySelectorAll('#b-panel .inner-tab').forEach(e=>e.classList.remove('active'));el.classList.add('active');if(t==='ops')renderOps();}
 
 let cliFoundData=null, carFoundData=null, planFoundData=null;
 
@@ -1596,6 +1601,97 @@ let scannerTab = null;
 // ══════════════════════════════════════════
 // SCANNER PROMOS — Barista canjea promo del cliente
 // ══════════════════════════════════════════
+// ══════════════════════════════════════════
+// REGISTRO RÁPIDO DESDE BARISTA
+// ══════════════════════════════════════════
+function mostrarRegBarista(){
+  let modal = document.getElementById('reg-barista-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'reg-barista-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(26,28,20,.97);z-index:9997;display:flex;flex-direction:column;overflow-y:auto;padding:24px;';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div style="max-width:400px;margin:0 auto;width:100%;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div>
+          <div style="font-size:10px;color:#9A9880;letter-spacing:.1em;">NUEVO AFILIADO</div>
+          <div style="font-size:18px;font-weight:700;color:#F2EDE4;">Registrar cliente</div>
+        </div>
+        <button onclick="document.getElementById('reg-barista-modal').style.display='none'"
+          style="background:transparent;border:1px solid #5A5E50;color:var(--light);padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;">
+          Cancelar
+        </button>
+      </div>
+      <!-- Atribución visible -->
+      <div style="background:#2C2A1E;border-radius:10px;padding:12px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+        <div style="font-size:24px;">👤</div>
+        <div>
+          <div style="font-size:11px;color:#9A9880;">Afiliado por</div>
+          <div style="font-size:14px;font-weight:700;color:var(--terra);">${baristaActual.nombre}</div>
+          <div style="font-size:11px;color:#9A9880;">${baristaActual.sucursal}</div>
+        </div>
+      </div>
+      <div class="label-s" style="color:#9A9880;margin-bottom:6px;">Nombre completo</div>
+      <input class="input-dk" id="rb-nombre" placeholder="Nombre del cliente" style="margin-bottom:12px;"/>
+      <div class="label-s" style="color:#9A9880;margin-bottom:6px;">Teléfono</div>
+      <input class="input-dk" id="rb-tel" placeholder="55 1234 5678" type="tel" inputmode="numeric" style="margin-bottom:12px;font-family:monospace;"/>
+      <div class="label-s" style="color:#9A9880;margin-bottom:6px;">PIN del cliente (4 dígitos)</div>
+      <input class="input-dk" id="rb-pin" placeholder="••••" type="password" inputmode="numeric" maxlength="4" style="margin-bottom:12px;font-size:22px;letter-spacing:8px;text-align:center;"/>
+      <div class="label-s" style="color:#9A9880;margin-bottom:6px;">Carga inicial (mín. $50)</div>
+      <input class="input-dk" id="rb-monto" placeholder="$150" type="number" min="50"
+        style="margin-bottom:4px;font-size:20px;text-align:center;"
+        oninput="this.nextElementSibling.textContent=parseFloat(this.value)>=50?'Cliente recibe: '+fmt(parseFloat(this.value)*1.1)+' (+ bono 10%)':''"/>
+      <div style="font-size:11px;color:#E87A5A;text-align:center;margin-bottom:16px;min-height:16px;"></div>
+      <button onclick="registrarDesdeBarista()"
+        style="width:100%;background:var(--terra);border:none;color:#fff;padding:14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">
+        Afiliar y cargar saldo
+      </button>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+async function registrarDesdeBarista(){
+  const nombre = document.getElementById('rb-nombre').value.trim();
+  const tel = document.getElementById('rb-tel').value.replace(/\D/g,'');
+  const pin = document.getElementById('rb-pin').value.trim();
+  const monto = parseFloat(document.getElementById('rb-monto').value)||0;
+  if(!nombre){showToast('Escribe el nombre',false);return;}
+  if(tel.length<10){showToast('Teléfono de 10 dígitos',false);return;}
+  if(pin.length<4){showToast('PIN de 4 dígitos',false);return;}
+  if(monto<50){showToast('Carga mínima $50',false);return;}
+  showLoader(true);
+  try {
+    const {count} = await sb.from('wallet_clientes').select('*',{count:'exact',head:true});
+    const codigo = 'cc'+String((count||0)+1).padStart(2,'0');
+    const saldo = monto * 1.1;
+    const folio = genFolio('activacion');
+    // Registrar cliente con atribución al barista
+    const {data:cli,error} = await sb.from('wallet_clientes').insert({
+      codigo, nombre, telefono:tel, pin, saldo, activo:true,
+      referido_por: baristaActual.nombre
+    }).select().single();
+    if(error) throw error;
+    // Registrar movimiento
+    await sb.from('wallet_movimientos').insert({
+      cliente_id:cli.id, tipo:'carga', monto,
+      descripcion:`[${folio}] Activación + bono ${fmt(monto*0.1)}`,
+      metodo:'efectivo', barista:baristaActual.nombre, sucursal:baristaActual.sucursal
+    });
+    // Comisión de activación para el barista
+    const mes = new Date().toISOString().slice(0,7);
+    await sb.from('wallet_comisiones').insert({
+      barista:baristaActual.nombre, sucursal:baristaActual.sucursal,
+      tipo:'activacion', monto_base:monto, comision:30, mes
+    });
+    document.getElementById('reg-barista-modal').style.display='none';
+    showToast(`✓ ${nombre} afiliado · ${folio} · +$30 comisión`);
+    renderOps();
+  } catch(e){showToast('Error: '+e.message,false);}
+  finally{showLoader(false);}
+}
+
 function abrirScannerPromo(){
   let modal = document.getElementById('scanner-modal');
   modal.style.display = 'flex';
@@ -1747,6 +1843,21 @@ function cerrarScanner(){
       scannerInstance = null;
     }).catch(()=>{ scannerInstance = null; });
   }
+}
+
+// ══════════════════════════════════════════
+// REFRESH COMISIONES BARISTA
+// ══════════════════════════════════════════
+let refreshOpsInterval = null;
+
+function iniciarRefreshOps(){
+  renderOps();
+  if(refreshOpsInterval) clearInterval(refreshOpsInterval);
+  refreshOpsInterval = setInterval(()=>{ if(baristaActual) renderOps(); }, 5000);
+}
+
+function detenerRefreshOps(){
+  if(refreshOpsInterval){ clearInterval(refreshOpsInterval); refreshOpsInterval=null; }
 }
 
 // ══════════════════════════════════════════
